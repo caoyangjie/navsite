@@ -8,12 +8,18 @@ moment.locale('zh-cn');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+// 添加上下文路径配置（从环境变量读取，默认为空即根路径）
+const BASE_PATH = (process.env.BASE_PATH || '').replace(/\/$/, ''); // 移除尾部斜杠
 
 // 解析JSON请求体
 app.use(express.json());
 
 // 静态文件服务
-app.use(express.static(path.join(__dirname, 'public')));
+if (BASE_PATH) {
+  app.use(BASE_PATH, express.static(path.join(__dirname, 'public')));
+} else {
+  app.use(express.static(path.join(__dirname, 'public')));
+}
 
 // 缓存tenant_access_token及其过期时间
 let cachedToken = null;
@@ -176,7 +182,7 @@ const mockData = {
 };
 
 // API路由 - 获取导航数据
-app.get('/api/navigation', async (req, res) => {
+app.get(`${BASE_PATH}/api/navigation`, async (req, res) => {
   try {
     let data;
     let categories;
@@ -223,7 +229,7 @@ app.get('/api/navigation', async (req, res) => {
 });
 
 // Favicon代理端点
-app.get('/api/favicon', async (req, res) => {
+app.get(`${BASE_PATH}/api/favicon`, async (req, res) => {
   try {
     const { url } = req.query;
     
@@ -281,12 +287,12 @@ app.get('/api/favicon', async (req, res) => {
 });
 
 // 主页路由
-app.get('/', (req, res) => {
+app.get(`${BASE_PATH}/`, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // 添加新的网站链接
-app.post('/api/links', async (req, res) => {
+app.post(`${BASE_PATH}/api/links`, async (req, res) => {
   try {
     // 解析请求体
     let requestBody = req.body;
@@ -391,7 +397,7 @@ app.post('/api/links', async (req, res) => {
 });
 
 // 删除网站链接
-app.delete('/api/links/:id', async (req, res) => {
+app.delete(`${BASE_PATH}/api/links/:id`, async (req, res) => {
   try {
     const recordId = req.params.id;
     
@@ -441,5 +447,6 @@ app.delete('/api/links/:id', async (req, res) => {
 
 // 启动服务器
 app.listen(PORT, () => {
-  console.log(`服务器运行在 http://localhost:${PORT}`);
+  const baseUrl = BASE_PATH ? `http://localhost:${PORT}${BASE_PATH}` : `http://localhost:${PORT}`;
+  console.log(`服务器运行在 ${baseUrl}`);
 });

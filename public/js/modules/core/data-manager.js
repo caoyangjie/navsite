@@ -68,7 +68,10 @@ class DataManager {
     }
 
     try {
-      const response = await fetch('/api/navigation');
+      // 使用基础路径
+      const basePath = window.BASE_PATH || '';
+      const apiUrl = `${basePath}/api/navigation`;
+      const response = await fetch(apiUrl);
       
       // 检查响应状态
       if (!response.ok) {
@@ -159,7 +162,8 @@ class DataManager {
   // 添加链接
   async addLink(linkData) {
     try {
-      const response = await fetch('/api/links', {
+      const basePath = window.BASE_PATH || '';
+      const response = await fetch(`${basePath}/api/links`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -187,7 +191,8 @@ class DataManager {
   // 删除链接
   async deleteLink(linkId) {
     try {
-      const response = await fetch(`/api/links/${linkId}`, {
+      const basePath = window.BASE_PATH || '';
+      const response = await fetch(`${basePath}/api/links/${linkId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json'

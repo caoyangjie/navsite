@@ -2,12 +2,12 @@
   "name": "水果导航 - 个人网站导航工具",
   "short_name": "水果导航",
   "description": "基于飞书多维表格的个人网站导航工具，支持分类管理、搜索功能、暗黑模式等特性",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#ff0066",
   "orientation": "portrait-primary",
-  "scope": "/",
+  "scope": "./",
   "lang": "zh-CN",
   "categories": ["productivity", "utilities", "navigation"],
   "icons": [
@@ -64,7 +64,7 @@
     {
       "name": "搜索网站",
       "short_name": "搜索",
-      "url": "/?search=true",
+      "url": "./?search=true",
       "icons": [
         {
           "src": "img/icons/icon-192x192.png",

@@ -3,21 +3,27 @@
  * 负责加载所有模块并初始化应用程序
  */
 
+// 获取基础路径辅助函数
+function getBasePath() {
+  return window.BASE_PATH || '';
+}
+
 // 加载模块脚本
 function loadModules() {
+  const basePath = getBasePath();
   const modules = [
     // 核心模块
-    '/js/modules/core/pwa-manager.js',
-    '/js/modules/core/theme-manager.js', 
-    '/js/modules/core/data-manager.js',
-    '/js/modules/core/ui-renderer.js',
+    `${basePath}/js/modules/core/pwa-manager.js`,
+    `${basePath}/js/modules/core/theme-manager.js`, 
+    `${basePath}/js/modules/core/data-manager.js`,
+    `${basePath}/js/modules/core/ui-renderer.js`,
     
     // 功能模块
-    '/js/modules/features/link-manager.js',
-    '/js/modules/features/interaction-manager.js',
+    `${basePath}/js/modules/features/link-manager.js`,
+    `${basePath}/js/modules/features/interaction-manager.js`,
     
     // 工具模块
-    '/js/modules/utils/common-utils.js'
+    `${basePath}/js/modules/utils/common-utils.js`
   ];
 
   return Promise.all(

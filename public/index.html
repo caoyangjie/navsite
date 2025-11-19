@@ -7,8 +7,29 @@
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>水果导航</title>
   
+  <!-- 基础路径配置 -->
+  <script>
+    // 自动检测基础路径
+    window.BASE_PATH = (function() {
+      // 从当前路径中提取基础路径（例如 /tab）
+      const pathMatch = window.location.pathname.match(/^(\/[^\/]+)/);
+      return pathMatch ? pathMatch[1] : '';
+    })();
+    
+    // 设置基础路径辅助函数
+    window.getBasePath = function(path) {
+      if (!path) return window.BASE_PATH || '';
+      if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('//')) {
+        return path;
+      }
+      const base = window.BASE_PATH || '';
+      const cleanPath = path.startsWith('/') ? path : '/' + path;
+      return base + cleanPath;
+    };
+  </script>
+  
   <!-- PWA Manifest -->
-  <link rel="manifest" href="manifest.json">
+  <link rel="manifest" href="" id="manifest-link">
   
   <!-- PWA Meta Tags -->
   <meta name="application-name" content="水果导航">

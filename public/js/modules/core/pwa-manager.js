@@ -18,8 +18,12 @@ class PWAManager {
   async registerServiceWorker() {
     try {
       console.log('[PWA] 开始注册 Service Worker...');
-      const registration = await navigator.serviceWorker.register('/sw.js', {
-        scope: '/'
+      const basePath = window.BASE_PATH || '';
+      const swPath = `${basePath}/sw.js`;
+      const scope = basePath || '/';
+      
+      const registration = await navigator.serviceWorker.register(swPath, {
+        scope: scope
       });
 
       console.log('[PWA] Service Worker 注册成功:', registration.scope);
