@@ -15,6 +15,7 @@ function loadModules() {
     // 核心模块
     `${basePath}/js/modules/core/pwa-manager.js`,
     `${basePath}/js/modules/core/theme-manager.js`, 
+    `${basePath}/js/modules/core/auth-manager.js`,
     `${basePath}/js/modules/core/data-manager.js`,
     `${basePath}/js/modules/core/ui-renderer.js`,
     
@@ -44,6 +45,7 @@ let dataManager = null;
 let uiRenderer = null;
 let themeManager = null;
 let pwaManager = null;
+let authManager = null;
 let linkManager = null;
 let interactionManager = null;
 
@@ -106,6 +108,12 @@ async function initCoreModules() {
   // 初始化主题管理器
   themeManager = new window.ThemeManager();
   window.themeManager = themeManager; // 设置全局引用
+  
+  // 初始化验证管理器
+  authManager = new window.AuthManager();
+  window.authManager = authManager; // 设置全局引用
+  // 显式调用init方法
+  await authManager.init();
   
   // 初始化数据管理器
   dataManager = new window.DataManager();

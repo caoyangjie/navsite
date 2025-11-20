@@ -4,12 +4,25 @@ const path = require('path');
 const axios = require('axios');
 const moment = require('moment');
 const { Lunar } = require('lunar-javascript');
+const session = require('express-session');
 moment.locale('zh-cn');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 // 添加上下文路径配置（从环境变量读取，默认为空即根路径）
 const BASE_PATH = (process.env.BASE_PATH || '').replace(/\/$/, ''); // 移除尾部斜杠
+
+// 配置session（使用内存存储，生产环境建议使用Redis等）
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'navsite-secret-key-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // 生产环境使用HTTPS
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24小时
+  }
+}));
 
 // 解析JSON请求体
 app.use(express.json());
@@ -286,13 +299,90 @@ app.get(`${BASE_PATH}/api/favicon`, async (req, res) => {
   }
 });
 
+// 验证中间件 - 检查用户是否已登录
+function requireAuth(req, res, next) {
+  if (req.session && req.session.authenticated) {
+    return next();
+  } else {
+    return res.status(401).json({
+      success: false,
+      message: '需要验证，请先登录',
+      requiresAuth: true
+    });
+  }
+}
+
+// 登录API - 验证密码
+app.post(`${BASE_PATH}/api/auth/login`, async (req, res) => {
+  try {
+    const { password } = req.body;
+    
+    // 从环境变量获取密码，如果没有设置则使用默认密码（仅用于开发）
+    const correctPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    
+    if (!password) {
+      return res.status(400).json({
+        success: false,
+        message: '请输入密码'
+      });
+    }
+    
+    if (password === correctPassword) {
+      // 设置session
+      req.session.authenticated = true;
+      req.session.loginTime = Date.now();
+      
+      res.json({
+        success: true,
+        message: '登录成功'
+      });
+    } else {
+      res.status(401).json({
+        success: false,
+        message: '密码错误'
+      });
+    }
+  } catch (error) {
+    console.error('登录异常:', error.message);
+    res.status(500).json({
+      success: false,
+      message: `登录失败: ${error.message}`
+    });
+  }
+});
+
+// 登出API
+app.post(`${BASE_PATH}/api/auth/logout`, (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('登出异常:', err);
+      return res.status(500).json({
+        success: false,
+        message: '登出失败'
+      });
+    }
+    res.json({
+      success: true,
+      message: '已登出'
+    });
+  });
+});
+
+// 检查验证状态API
+app.get(`${BASE_PATH}/api/auth/status`, (req, res) => {
+  res.json({
+    success: true,
+    authenticated: !!(req.session && req.session.authenticated)
+  });
+});
+
 // 主页路由
 app.get(`${BASE_PATH}/`, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 添加新的网站链接
-app.post(`${BASE_PATH}/api/links`, async (req, res) => {
+// 添加新的网站链接（需要验证）
+app.post(`${BASE_PATH}/api/links`, requireAuth, async (req, res) => {
   try {
     // 解析请求体
     let requestBody = req.body;
@@ -396,8 +486,8 @@ app.post(`${BASE_PATH}/api/links`, async (req, res) => {
   }
 });
 
-// 删除网站链接
-app.delete(`${BASE_PATH}/api/links/:id`, async (req, res) => {
+// 删除网站链接（需要验证）
+app.delete(`${BASE_PATH}/api/links/:id`, requireAuth, async (req, res) => {
   try {
     const recordId = req.params.id;
     

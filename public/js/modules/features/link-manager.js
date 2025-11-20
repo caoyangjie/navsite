@@ -35,7 +35,7 @@ class LinkManager {
     }
 
     // 添加事件监听器（一次性绑定）
-    addLinkBtn.addEventListener('click', () => this.showAddModal());
+    addLinkBtn.addEventListener('click', async () => await this.showAddModal());
     closeModalBtn.addEventListener('click', () => this.hideAddModal());
     cancelAddBtn.addEventListener('click', () => this.hideAddModal());
     saveLinkBtn.addEventListener('click', () => this.submitAddForm());
@@ -145,7 +145,12 @@ class LinkManager {
   }
 
   // 显示添加模态框
-  showAddModal() {
+  async showAddModal() {
+    // 检查验证状态
+    if (window.authManager && !(await window.authManager.requireAuth())) {
+      return; // 如果未验证，requireAuth会显示登录模态框
+    }
+
     const addLinkModal = document.getElementById('add-link-modal');
     const addLinkForm = document.getElementById('add-link-form');
     

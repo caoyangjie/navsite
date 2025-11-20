@@ -161,6 +161,15 @@ class DataManager {
 
   // 添加链接
   async addLink(linkData) {
+    // 检查验证状态
+    if (window.authManager && !(await window.authManager.requireAuth())) {
+      return {
+        success: false,
+        message: '需要验证，请先登录',
+        requiresAuth: true
+      };
+    }
+
     try {
       const basePath = window.BASE_PATH || '';
       const response = await fetch(`${basePath}/api/links`, {
@@ -168,10 +177,16 @@ class DataManager {
         headers: {
           'Content-Type': 'application/json'
         },
+        credentials: 'include', // 重要：包含cookie以支持session
         body: JSON.stringify(linkData)
       });
 
       const result = await response.json();
+      
+      // 如果返回需要验证的错误，触发登录
+      if (result.requiresAuth && window.authManager) {
+        window.authManager.showLoginModal();
+      }
       
       if (result.success) {
         // 清除缓存，强制下次重新获取数据
@@ -190,16 +205,31 @@ class DataManager {
 
   // 删除链接
   async deleteLink(linkId) {
+    // 检查验证状态
+    if (window.authManager && !(await window.authManager.requireAuth())) {
+      return {
+        success: false,
+        message: '需要验证，请先登录',
+        requiresAuth: true
+      };
+    }
+
     try {
       const basePath = window.BASE_PATH || '';
       const response = await fetch(`${basePath}/api/links/${linkId}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'include' // 重要：包含cookie以支持session
       });
 
       const result = await response.json();
+      
+      // 如果返回需要验证的错误，触发登录
+      if (result.requiresAuth && window.authManager) {
+        window.authManager.showLoginModal();
+      }
       
       if (result.success) {
         // 清除缓存，强制下次重新获取数据
