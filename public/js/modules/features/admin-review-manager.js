@@ -189,6 +189,12 @@ class AdminReviewManager {
 
       if (result.success) {
         this.showSuccess('申请已同意，链接已添加到导航');
+        // 清除缓存，强制重新获取数据
+        if (window.dataManager) {
+          window.dataManager.clearCache();
+        }
+        // 触发数据变更事件，重新加载主页的多维表格数据
+        window.dispatchEvent(new Event('dataChanged'));
         // 重新加载列表
         this.loadPendingLinks(this.currentPageToken);
       } else {
