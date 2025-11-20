@@ -197,6 +197,50 @@ class DataManager {
     }
   }
 
+  // 更新链接
+  async updateLink(linkId, linkData) {
+    // 检查验证状态
+    if (window.authManager && !(await window.authManager.requireAuth())) {
+      return {
+        success: false,
+        message: '需要验证，请先登录',
+        requiresAuth: true
+      };
+    }
+
+    try {
+      const basePath = window.BASE_PATH || '';
+      const response = await fetch(`${basePath}/api/links/${linkId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include', // 重要：包含cookie以支持session
+        body: JSON.stringify(linkData)
+      });
+
+      const result = await response.json();
+      
+      // 如果返回需要验证的错误，触发登录
+      if (result.requiresAuth && window.authManager) {
+        window.authManager.showLoginModal();
+      }
+      
+      if (result.success) {
+        // 清除缓存，强制下次重新获取数据
+        this.clearCache();
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('更新链接异常:', error);
+      return {
+        success: false,
+        message: '网络错误，请检查网络连接后重试'
+      };
+    }
+  }
+
   // 删除链接
   async deleteLink(linkId) {
     // 检查验证状态

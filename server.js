@@ -281,6 +281,32 @@ async function createBitableRecord(token, fields) {
   }
 }
 
+// 更新正常表格中的记录
+async function updateBitableRecord(token, recordId, fields) {
+  try {
+    const response = await axios.put(
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${process.env.APP_TOKEN}/tables/${process.env.TABLE_ID}/records/${recordId}`,
+      { fields },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json; charset=utf-8'
+        }
+      }
+    );
+
+    if (response.data.code === 0) {
+      return response.data.data;
+    } else {
+      console.error('更新表格记录失败:', response.data);
+      throw new Error(`更新表格记录失败: ${response.data.msg}`);
+    }
+  } catch (error) {
+    console.error('更新表格记录异常:', error.message);
+    throw error;
+  }
+}
+
 // 删除临时表格记录
 async function deleteTempBitableRecord(recordId) {
   try {
@@ -918,6 +944,98 @@ app.post(`${BASE_PATH}/api/pending-links/:id/reject`, requireAuth, async (req, r
     res.status(500).json({
       success: false,
       message: `拒绝申请失败: ${error.message}`
+    });
+  }
+});
+
+// 更新网站链接（需要验证）
+app.put(`${BASE_PATH}/api/links/:id`, requireAuth, async (req, res) => {
+  try {
+    const recordId = req.params.id;
+    let requestBody = req.body;
+    
+    if (!recordId) {
+      return res.status(400).json({
+        success: false,
+        message: '记录ID不能为空'
+      });
+    }
+    
+    // 检查请求体是否存在
+    if (!requestBody) {
+      return res.status(400).json({
+        success: false,
+        message: '请求体不能为空'
+      });
+    }
+    
+    // 验证必要的字段
+    if (!requestBody.name || !requestBody.name.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: '网站名称不能为空'
+      });
+    }
+    
+    if (!requestBody.url || !requestBody.url.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: '网站网址不能为空'
+      });
+    }
+    
+    if (!requestBody.category || !requestBody.category.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: '分类不能为空'
+      });
+    }
+    
+    // 验证网址格式
+    try {
+      new URL(requestBody.url);
+    } catch (e) {
+      return res.status(400).json({
+        success: false,
+        message: '无效的网址格式，请确保包含http://或https://'
+      });
+    }
+    
+    // 验证网站名称长度
+    if (requestBody.name.length > 50) {
+      return res.status(400).json({
+        success: false,
+        message: '网站名称长度不能超过50个字符'
+      });
+    }
+    
+    // 获取飞书访问令牌
+    const token = await getTenantAccessToken();
+    
+    // 构建请求体，符合飞书多维表格API的要求
+    const fields = {
+      '分类': requestBody.category,
+      '排序': requestBody.sort || 200,
+      '站点名称': requestBody.name,
+      '网址': {
+        'link': requestBody.url,
+        'text': requestBody.name
+      }
+    };
+    
+    // 调用飞书多维表格API更新记录
+    const result = await updateBitableRecord(token, recordId, fields);
+    
+    res.json({
+      success: true,
+      message: '链接更新成功',
+      data: result
+    });
+  } catch (error) {
+    console.error('更新链接异常:', error.message);
+    res.status(500).json({
+      success: false,
+      message: `更新链接失败: ${error.message}`
     });
   }
 });

@@ -11,6 +11,7 @@ class LinkManager {
   init() {
     this.initAddLinkFeature();
     this.initDeleteLinkFeature();
+    this.initEditLinkFeature();
   }
 
   // 初始化添加链接功能
@@ -339,6 +340,415 @@ class LinkManager {
       if (saveLinkBtn) {
         saveLinkBtn.disabled = false;
         saveLinkBtn.textContent = '保存';
+      }
+    }
+  }
+
+  // 初始化编辑链接功能
+  initEditLinkFeature() {
+    const editLinkModal = document.getElementById('edit-link-modal');
+    const closeEditModalBtn = document.getElementById('close-edit-modal-btn');
+    const cancelEditBtn = document.getElementById('cancel-edit-btn');
+    const saveEditBtn = document.getElementById('save-edit-btn');
+    const editLinkForm = document.getElementById('edit-link-form');
+    const modalOverlay = editLinkModal?.querySelector('.modal-overlay');
+
+    // 检查元素是否存在
+    if (!editLinkModal || !closeEditModalBtn || !cancelEditBtn || !saveEditBtn || !editLinkForm) {
+      console.error('编辑链接功能的DOM元素未找到');
+      return;
+    }
+
+    // 关闭模态框事件
+    const closeModalEvents = [
+      { element: closeEditModalBtn, event: 'click' },
+      { element: cancelEditBtn, event: 'click' },
+      { element: modalOverlay, event: 'click' }
+    ];
+
+    closeModalEvents.forEach(({ element, event }) => {
+      if (element) {
+        element.addEventListener(event, (e) => {
+          // 如果点击的是覆盖层，确保不是点击模态框内容
+          if (element === modalOverlay && e.target !== modalOverlay) {
+            return;
+          }
+          this.hideEditModal();
+        });
+      }
+    });
+
+    // 保存编辑事件
+    saveEditBtn.addEventListener('click', () => this.submitEditForm());
+
+    // 阻止模态框内容点击事件冒泡到遮罩层
+    const modalContent = editLinkModal.querySelector('.modal-content');
+    if (modalContent) {
+      modalContent.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    }
+
+    // ESC键关闭模态框
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && editLinkModal.classList.contains('active')) {
+        this.hideEditModal();
+      }
+    });
+
+    // 实时验证
+    const siteNameInput = document.getElementById('edit-site-name');
+    const siteUrlInput = document.getElementById('edit-site-url');
+    
+    if (siteNameInput) {
+      siteNameInput.addEventListener('input', () => {
+        const value = siteNameInput.value.trim();
+        if (value.length > 50) {
+          this.showEditError('name', '网站名称长度不能超过50个字符');
+        } else {
+          this.clearEditFieldError('name');
+        }
+      });
+    }
+
+    if (siteUrlInput) {
+      siteUrlInput.addEventListener('input', () => {
+        const value = siteUrlInput.value.trim();
+        if (value) {
+          try {
+            new URL(value);
+            this.clearEditFieldError('url');
+          } catch (e) {
+            this.showEditError('url', '无效的网址格式，请确保包含http://或https://');
+          }
+        } else {
+          this.clearEditFieldError('url');
+        }
+      });
+      
+      // 网址自动补全
+      const debouncedAutoComplete = debounce(() => {
+        this.autoCompleteEditUrl();
+      }, 300);
+      
+      siteUrlInput.addEventListener('input', debouncedAutoComplete);
+      
+      siteUrlInput.addEventListener('blur', () => {
+        this.autoCompleteEditUrl();
+        this.extractDomainForEditSiteName();
+      });
+    }
+
+    // 控制自定义分类输入框的显示/隐藏
+    const categorySelect = document.getElementById('edit-site-category');
+    const customCategoryContainer = document.getElementById('edit-custom-category-container');
+    
+    if (categorySelect && customCategoryContainer) {
+      categorySelect.addEventListener('change', () => {
+        if (categorySelect.value === 'custom') {
+          customCategoryContainer.style.display = 'block';
+          const customCategoryInput = document.getElementById('edit-custom-category');
+          if (customCategoryInput) {
+            customCategoryInput.focus();
+          }
+        } else {
+          customCategoryContainer.style.display = 'none';
+        }
+      });
+    }
+  }
+
+  // 显示编辑模态框
+  async showEditModal(linkId, linkName, linkUrl, linkCategory, linkSort) {
+    const editLinkModal = document.getElementById('edit-link-modal');
+    const editLinkForm = document.getElementById('edit-link-form');
+    
+    if (!editLinkModal || !editLinkForm) return;
+
+    // 保存当前编辑的链接ID
+    editLinkModal.dataset.linkId = linkId;
+
+    editLinkModal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    // 填充分类
+    this.populateEditCategories();
+
+    // 填充表单数据
+    document.getElementById('edit-site-name').value = linkName || '';
+    document.getElementById('edit-site-url').value = linkUrl || '';
+    document.getElementById('edit-site-sort').value = linkSort || 200;
+
+    // 设置分类
+    const categorySelect = document.getElementById('edit-site-category');
+    const customCategoryContainer = document.getElementById('edit-custom-category-container');
+    const customCategoryInput = document.getElementById('edit-custom-category');
+    
+    if (categorySelect) {
+      // 检查是否是现有分类
+      const { categories } = this.dataManager.getCurrentData();
+      if (categories && categories.includes(linkCategory)) {
+        categorySelect.value = linkCategory;
+        if (customCategoryContainer) {
+          customCategoryContainer.style.display = 'none';
+        }
+      } else {
+        // 自定义分类
+        categorySelect.value = 'custom';
+        if (customCategoryContainer) {
+          customCategoryContainer.style.display = 'block';
+        }
+        if (customCategoryInput) {
+          customCategoryInput.value = linkCategory || '';
+        }
+      }
+    }
+
+    this.clearEditErrors();
+
+    // 聚焦到网址输入框
+    setTimeout(() => {
+      const siteUrlInput = document.getElementById('edit-site-url');
+      if (siteUrlInput) {
+        siteUrlInput.focus();
+      }
+    }, 300);
+  }
+
+  // 隐藏编辑模态框
+  hideEditModal() {
+    const editLinkModal = document.getElementById('edit-link-modal');
+    if (!editLinkModal) return;
+
+    editLinkModal.classList.remove('active');
+    document.body.style.overflow = '';
+    this.clearEditErrors();
+  }
+
+  // 填充分类下拉菜单（编辑表单）
+  populateEditCategories() {
+    const categorySelect = document.getElementById('edit-site-category');
+    if (!categorySelect) return;
+
+    // 清空现有选项
+    categorySelect.innerHTML = '<option value="">请选择分类</option>';
+
+    const { categories } = this.dataManager.getCurrentData();
+
+    // 添加现有分类
+    if (categories && categories.length > 0) {
+      categories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        categorySelect.appendChild(option);
+      });
+    } else {
+      // 如果没有分类数据，添加默认分类
+      const defaultCategories = ['主页', '工具', '文档', '社交', '娱乐', '其他'];
+      defaultCategories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        categorySelect.appendChild(option);
+      });
+    }
+
+    // 添加自定义选项
+    const customOption = document.createElement('option');
+    customOption.value = 'custom';
+    customOption.textContent = '自定义...';
+    categorySelect.appendChild(customOption);
+  }
+
+  // 清除所有错误提示（编辑表单）
+  clearEditErrors() {
+    this.clearEditFieldError('name');
+    this.clearEditFieldError('url');
+    this.clearEditFieldError('category');
+  }
+
+  // 清除单个字段的错误提示（编辑表单）
+  clearEditFieldError(fieldId) {
+    const errorElement = document.getElementById(`edit-${fieldId}-error`);
+    if (errorElement) {
+      errorElement.textContent = '';
+    }
+  }
+
+  // 显示错误提示（编辑表单）
+  showEditError(fieldId, message) {
+    const errorElement = document.getElementById(`edit-${fieldId}-error`);
+    if (errorElement) {
+      errorElement.textContent = message;
+    }
+  }
+
+  // 验证编辑表单
+  validateEditForm() {
+    let isValid = true;
+    this.clearEditErrors();
+
+    // 验证网站名称
+    const siteName = document.getElementById('edit-site-name').value.trim();
+    if (!siteName) {
+      this.showEditError('name', '请输入网站名称');
+      isValid = false;
+    } else if (siteName.length > 50) {
+      this.showEditError('name', '网站名称长度不能超过50个字符');
+      isValid = false;
+    }
+
+    // 验证网址
+    const siteUrl = document.getElementById('edit-site-url').value.trim();
+    if (!siteUrl) {
+      this.showEditError('url', '请输入网站网址');
+      isValid = false;
+    } else {
+      try {
+        new URL(siteUrl);
+      } catch (e) {
+        this.showEditError('url', '无效的网址格式，请确保包含http://或https://');
+        isValid = false;
+      }
+    }
+
+    // 验证分类
+    const siteCategory = document.getElementById('edit-site-category').value;
+    const customCategory = document.getElementById('edit-custom-category').value.trim();
+    
+    if (siteCategory === 'custom') {
+      if (!customCategory) {
+        this.showEditError('category', '请输入自定义分类名称');
+        isValid = false;
+      } else if (customCategory.length > 20) {
+        this.showEditError('category', '分类名称长度不能超过20个字符');
+        isValid = false;
+      }
+    } else if (!siteCategory) {
+      this.showEditError('category', '请选择分类');
+      isValid = false;
+    }
+
+    return isValid;
+  }
+
+  // 提交编辑表单
+  async submitEditForm() {
+    if (!this.validateEditForm()) {
+      return;
+    }
+
+    const editLinkModal = document.getElementById('edit-link-modal');
+    const linkId = editLinkModal?.dataset.linkId;
+
+    if (!linkId) {
+      this.showErrorMessage('无效的链接ID');
+      return;
+    }
+
+    // 收集表单数据
+    const siteName = document.getElementById('edit-site-name').value.trim();
+    const siteUrl = document.getElementById('edit-site-url').value.trim();
+    const siteCategory = document.getElementById('edit-site-category').value;
+    const customCategory = document.getElementById('edit-custom-category').value.trim();
+    const siteSort = document.getElementById('edit-site-sort').value ? parseInt(document.getElementById('edit-site-sort').value) : 200;
+    
+    // 确定最终使用的分类
+    let finalCategory = siteCategory;
+    if (siteCategory === 'custom' && customCategory) {
+      finalCategory = customCategory;
+    }
+    
+    const formData = {
+      name: siteName,
+      url: siteUrl,
+      category: finalCategory,
+      sort: siteSort
+    };
+
+    // 禁用保存按钮，防止重复提交
+    const saveEditBtn = document.getElementById('save-edit-btn');
+    if (saveEditBtn) {
+      saveEditBtn.disabled = true;
+      saveEditBtn.textContent = '保存中...';
+    }
+
+    try {
+      // 调用数据管理器的更新方法
+      const result = await this.dataManager.updateLink(linkId, formData);
+
+      if (result.success) {
+        // 显示成功提示
+        this.showSuccessMessage('更新成功');
+
+        // 隐藏模态框
+        this.hideEditModal();
+
+        // 触发数据刷新事件
+        window.dispatchEvent(new CustomEvent('dataChanged'));
+      } else {
+        // 显示错误提示
+        this.showErrorMessage(result.message || '更新失败');
+      }
+    } catch (error) {
+      console.error('更新异常:', error);
+      this.showErrorMessage('网络错误，请检查网络连接后重试');
+    } finally {
+      // 恢复保存按钮状态
+      if (saveEditBtn) {
+        saveEditBtn.disabled = false;
+        saveEditBtn.textContent = '保存';
+      }
+    }
+  }
+
+  // 自动补全 URL 协议前缀（编辑表单）
+  autoCompleteEditUrl() {
+    const siteUrlInput = document.getElementById('edit-site-url');
+    if (!siteUrlInput) return;
+    
+    let url = siteUrlInput.value.trim();
+    if (!url) return;
+    
+    // 检查是否已经包含协议前缀
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      // 添加 https:// 前缀
+      url = 'https://' + url;
+      siteUrlInput.value = url;
+      
+      // 触发 input 事件，以便实时验证能够检测到变化
+      const inputEvent = new Event('input', { bubbles: true });
+      siteUrlInput.dispatchEvent(inputEvent);
+    }
+  }
+  
+  // 从 URL 中提取域名作为网站名称（编辑表单）
+  extractDomainForEditSiteName() {
+    const siteUrlInput = document.getElementById('edit-site-url');
+    const siteNameInput = document.getElementById('edit-site-name');
+    
+    if (!siteUrlInput || !siteNameInput) return;
+    
+    const url = siteUrlInput.value.trim();
+    const currentName = siteNameInput.value.trim();
+    
+    // 只有当网址不为空且网站名称为空时才进行提取
+    if (url && !currentName) {
+      try {
+        // 使用 URL 对象解析网址
+        const urlObj = new URL(url);
+        // 提取域名（hostname）
+        const domain = urlObj.hostname;
+        
+        // 如果域名以 'www.' 开头，则移除 'www.'
+        const cleanDomain = domain.startsWith('www.') ? domain.substring(4) : domain;
+        
+        // 将提取的域名填充到网站名称输入框
+        siteNameInput.value = cleanDomain;
+      } catch (e) {
+        // 如果 URL 解析失败，则不进行任何操作
+        console.log('URL 解析失败，无法提取域名:', e);
       }
     }
   }

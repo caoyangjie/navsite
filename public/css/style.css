@@ -1379,11 +1379,47 @@ body {
   border-color: #ff7875;
 }
 
-/* 工具项删除按钮样式 */
-.tool-item-delete-btn {
+/* 工具项操作按钮容器样式 */
+.tool-item-actions {
   position: absolute;
   top: 8px;
   right: 8px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: all 0.3s ease;
+  z-index: 2;
+}
+
+.tool-item:hover .tool-item-actions {
+  opacity: 1;
+}
+
+/* 工具项编辑按钮样式 */
+.tool-item-edit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background-color: rgba(0, 123, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.tool-item-edit-btn i {
+  font-size: 14px;
+  color: #007bff;
+}
+
+.tool-item-edit-btn:hover {
+  background-color: rgba(0, 123, 255, 0.2);
+}
+
+/* 工具项删除按钮样式 */
+.tool-item-delete-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1393,18 +1429,12 @@ body {
   border: none;
   border-radius: 50%;
   cursor: pointer;
-  opacity: 0;
   transition: all 0.3s ease;
-  z-index: 2;
 }
 
 .tool-item-delete-btn i {
   font-size: 14px;
   color: #ff4d4f;
-}
-
-.tool-item:hover .tool-item-delete-btn {
-  opacity: 1;
 }
 
 .tool-item-delete-btn:hover {

@@ -277,6 +277,54 @@
   </div>
 </div>
 
+<!-- 编辑链接模态框 -->
+<div id="edit-link-modal" class="modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>编辑网站</h2>
+      <button id="close-edit-modal-btn" class="close-modal-btn" aria-label="关闭">
+        <i class="bi bi-x"></i>
+      </button>
+    </div>
+    
+    <div class="modal-body">
+      <form id="edit-link-form">
+        <div class="form-group">
+          <label for="edit-site-url">网站网址 *</label>
+          <input type="url" id="edit-site-url" name="edit-site-url" placeholder="请输入完整网址，包含http://或https://">
+          <div class="error-message" id="edit-url-error"></div>
+        </div>
+        <div class="form-group">
+          <label for="edit-site-name">网站名称 *</label>
+          <input type="text" id="edit-site-name" name="edit-site-name" placeholder="请输入网站名称" maxlength="50">
+          <div class="error-message" id="edit-name-error"></div>
+        </div>        
+        <div class="form-group">
+          <label for="edit-site-category">分类 *</label>
+          <select id="edit-site-category" name="edit-site-category">
+            <!-- 动态生成的分类选项 -->
+          </select>
+          <div id="edit-custom-category-container" style="display: none; margin-top: 10px;">
+            <input type="text" id="edit-custom-category" name="edit-custom-category" placeholder="请输入自定义分类名称" maxlength="20">
+          </div>
+          <div class="error-message" id="edit-category-error"></div>
+        </div>
+        
+        <div class="form-group">
+          <label for="edit-site-sort">排序 (可选)</label>
+          <input type="number" id="edit-site-sort" name="edit-site-sort" placeholder="数字越小，排序越靠前" min="0" max="999" value="200">
+        </div>
+      </form>
+    </div>
+    
+    <div class="modal-footer">
+      <button id="cancel-edit-btn" class="cancel-btn">取消</button>
+      <button id="save-edit-btn" class="save-btn">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- 删除确认模态框 -->
 <div id="delete-link-modal" class="modal">
   <div class="modal-overlay"></div>

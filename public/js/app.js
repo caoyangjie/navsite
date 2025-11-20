@@ -184,6 +184,16 @@ function bindEventListeners() {
     console.log('数据发生变更，重新加载...');
     await loadAndDisplayData();
   });
+
+  // 认证状态变更事件监听器（用于更新编辑按钮的显示）
+  window.addEventListener('authStatusChanged', () => {
+    console.log('认证状态发生变更，重新渲染工具项...');
+    // 重新渲染当前分类的工具项，以便显示或隐藏编辑按钮
+    if (uiRenderer) {
+      const currentCategory = uiRenderer.getCurrentCategory();
+      uiRenderer.showTools(currentCategory);
+    }
+  });
 }
 
 // 处理初始化错误

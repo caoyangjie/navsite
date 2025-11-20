@@ -257,26 +257,64 @@ class UIRenderer {
       <div class="tool-name">${tool.name}</div>
     `;
 
-    // 添加删除按钮
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'tool-item-delete-btn';
-    deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
-    deleteBtn.title = '删除网站';
-    deleteBtn.dataset.toolId = tool.id || '';
-    deleteBtn.dataset.toolName = tool.name || '';
+    // 检查是否为管理员（仅在管理员登录时显示编辑和删除按钮）
+    const isAdmin = window.authManager && window.authManager.authenticated;
 
-    // 添加点击事件
-    deleteBtn.addEventListener('click', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-      if (window.linkManager) {
-        window.linkManager.showDeleteConfirmation(tool.id || '', tool.name || '');
-      }
-    });
+    // 添加操作按钮容器（仅在管理员登录时显示）
+    if (isAdmin) {
+      const actionsContainer = document.createElement('div');
+      actionsContainer.className = 'tool-item-actions';
+
+      // 添加编辑按钮
+      const editBtn = document.createElement('button');
+      editBtn.className = 'tool-item-edit-btn';
+      editBtn.innerHTML = '<i class="bi bi-pencil"></i>';
+      editBtn.title = '编辑网站';
+      editBtn.dataset.toolId = tool.id || '';
+      editBtn.dataset.toolName = tool.name || '';
+      editBtn.dataset.toolUrl = urlString || '';
+      editBtn.dataset.toolCategory = tool.category || '';
+      editBtn.dataset.toolSort = tool.sort || '200';
+
+      // 添加编辑点击事件
+      editBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.linkManager) {
+          window.linkManager.showEditModal(
+            tool.id || '',
+            tool.name || '',
+            urlString || '',
+            tool.category || '',
+            tool.sort || 200
+          );
+        }
+      });
+
+      // 添加删除按钮
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'tool-item-delete-btn';
+      deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+      deleteBtn.title = '删除网站';
+      deleteBtn.dataset.toolId = tool.id || '';
+      deleteBtn.dataset.toolName = tool.name || '';
+
+      // 添加删除点击事件
+      deleteBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.linkManager) {
+          window.linkManager.showDeleteConfirmation(tool.id || '', tool.name || '');
+        }
+      });
+
+      actionsContainer.appendChild(editBtn);
+      actionsContainer.appendChild(deleteBtn);
+      toolItem.appendChild(actionsContainer);
+    }
 
     // 组装工具项
     toolItem.appendChild(linkElement);
-    toolItem.appendChild(deleteBtn);
 
     this.toolsGrid.appendChild(toolItem);
   }
