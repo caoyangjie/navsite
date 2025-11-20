@@ -22,6 +22,7 @@ function loadModules() {
     // 功能模块
     `${basePath}/js/modules/features/link-manager.js`,
     `${basePath}/js/modules/features/interaction-manager.js`,
+    `${basePath}/js/modules/features/admin-review-manager.js`,
     
     // 工具模块
     `${basePath}/js/modules/utils/common-utils.js`

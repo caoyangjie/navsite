@@ -372,6 +372,176 @@ class AuthManager {
         loginBtnDesktop.classList.remove('authenticated');
       }
     }
+
+    // 更新合并后的审核/申请按钮
+    this.updateReviewButton();
+  }
+
+  // 显示游客申请查看弹窗
+  showPendingLinksModal() {
+    const modal = document.getElementById('admin-review-modal');
+    if (modal) {
+      modal.classList.add('active');
+      document.body.style.overflow = 'hidden';
+      
+      // 初始化管理员审核管理器（游客模式）
+      if (window.AdminReviewManager) {
+        if (!window.adminReviewManagerInstance) {
+          window.adminReviewManagerInstance = new window.AdminReviewManager('admin-pending-links-container', false);
+        } else {
+          // 设置为游客模式
+          window.adminReviewManagerInstance.setAdminMode(false);
+        }
+        window.adminReviewManagerInstance.loadPendingLinks();
+      }
+
+      // 绑定关闭按钮事件
+      const closeBtn = document.getElementById('close-admin-review-modal-btn');
+      const overlay = modal.querySelector('.modal-overlay');
+      
+      if (closeBtn) {
+        closeBtn.onclick = () => this.hideAdminReviewModal();
+      }
+      
+      if (overlay) {
+        overlay.onclick = () => this.hideAdminReviewModal();
+      }
+
+      // ESC键关闭
+      const escHandler = (e) => {
+        if (e.key === 'Escape' && modal.classList.contains('active')) {
+          this.hideAdminReviewModal();
+          document.removeEventListener('keydown', escHandler);
+        }
+      };
+      document.addEventListener('keydown', escHandler);
+    }
+  }
+
+  // 更新合并后的审核/申请按钮
+  updateReviewButton() {
+    // 桌面端
+    const reviewBtnDesktop = document.getElementById('review-btn-desktop');
+    const reviewStatusText = document.getElementById('review-status-text');
+    
+    if (reviewBtnDesktop) {
+      if (this.authenticated) {
+        // 已登录：显示"审核管理"
+        reviewBtnDesktop.style.display = 'flex';
+        const icon = reviewBtnDesktop.querySelector('i');
+        if (icon) {
+          icon.className = 'bi bi-shield-check';
+        }
+        if (reviewStatusText) {
+          reviewStatusText.textContent = '审核管理';
+        }
+        reviewBtnDesktop.title = '审核管理';
+        reviewBtnDesktop.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.showAdminReviewModal();
+        };
+      } else {
+        // 未登录：显示"游客申请"
+        reviewBtnDesktop.style.display = 'flex';
+        const icon = reviewBtnDesktop.querySelector('i');
+        if (icon) {
+          icon.className = 'bi bi-clock-history';
+        }
+        if (reviewStatusText) {
+          reviewStatusText.textContent = '游客申请';
+        }
+        reviewBtnDesktop.title = '游客申请';
+        reviewBtnDesktop.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.showPendingLinksModal();
+        };
+      }
+    }
+
+    // 移动端
+    const reviewBtnMobile = document.getElementById('review-btn-mobile');
+    
+    if (reviewBtnMobile) {
+      if (this.authenticated) {
+        // 已登录：显示"审核管理"
+        reviewBtnMobile.style.display = 'flex';
+        reviewBtnMobile.innerHTML = '<i class="bi bi-shield-check"></i>';
+        reviewBtnMobile.title = '审核管理';
+        reviewBtnMobile.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.showAdminReviewModal();
+        };
+      } else {
+        // 未登录：显示"游客申请"
+        reviewBtnMobile.style.display = 'flex';
+        reviewBtnMobile.innerHTML = '<i class="bi bi-clock-history"></i>';
+        reviewBtnMobile.title = '游客申请';
+        reviewBtnMobile.onclick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.showPendingLinksModal();
+        };
+      }
+    }
+  }
+
+  // 显示管理员审核弹窗
+  showAdminReviewModal() {
+    // 检查是否已登录
+    if (!this.authenticated) {
+      this.showLoginModal();
+      return;
+    }
+
+    const modal = document.getElementById('admin-review-modal');
+    if (modal) {
+      modal.classList.add('active');
+      document.body.style.overflow = 'hidden';
+      
+      // 初始化管理员审核管理器（管理员模式）
+      if (window.AdminReviewManager) {
+        if (!window.adminReviewManagerInstance) {
+          window.adminReviewManagerInstance = new window.AdminReviewManager('admin-pending-links-container', true);
+        } else {
+          // 设置为管理员模式
+          window.adminReviewManagerInstance.setAdminMode(true);
+        }
+        window.adminReviewManagerInstance.loadPendingLinks();
+      }
+
+      // 绑定关闭按钮事件
+      const closeBtn = document.getElementById('close-admin-review-modal-btn');
+      const overlay = modal.querySelector('.modal-overlay');
+      
+      if (closeBtn) {
+        closeBtn.onclick = () => this.hideAdminReviewModal();
+      }
+      
+      if (overlay) {
+        overlay.onclick = () => this.hideAdminReviewModal();
+      }
+
+      // ESC键关闭
+      const escHandler = (e) => {
+        if (e.key === 'Escape' && modal.classList.contains('active')) {
+          this.hideAdminReviewModal();
+          document.removeEventListener('keydown', escHandler);
+        }
+      };
+      document.addEventListener('keydown', escHandler);
+    }
+  }
+
+  // 隐藏管理员审核弹窗
+  hideAdminReviewModal() {
+    const modal = document.getElementById('admin-review-modal');
+    if (modal) {
+      modal.classList.remove('active');
+      document.body.style.overflow = '';
+    }
   }
 
   // 检查是否需要验证（在增删改操作前调用）

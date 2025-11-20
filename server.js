@@ -34,13 +34,17 @@ if (BASE_PATH) {
   app.use(express.static(path.join(__dirname, 'public')));
 }
 
-// 缓存tenant_access_token及其过期时间
+// 缓存tenant_access_token及其过期时间（正常表格）
 let cachedToken = null;
 let tokenExpireTime = null;
 
-// 获取tenant_access_token
+// 缓存临时表格的tenant_access_token及其过期时间
+let cachedTempToken = null;
+let tempTokenExpireTime = null;
+
+// 获取tenant_access_token（正常表格）
 async function getTenantAccessToken() {
-  // 检查缓存的token是否存在且未过期（预留5分钟的缓冲时间）
+// 检查缓存的token是否存在且未过期（预留5分钟的缓冲时间）
   const now = Date.now();
   if (cachedToken && tokenExpireTime && now < tokenExpireTime - 5 * 60 * 1000) {
     console.log('使用缓存的tenant_access_token');
@@ -79,30 +83,228 @@ async function getTenantAccessToken() {
   }
 }
 
-// 获取多维表格数据
-async function getBitableData(token) {
+// 获取临时表格的tenant_access_token
+async function getTempTenantAccessToken() {
+  // 如果临时表格使用相同的APP_ID和APP_SECRET，则复用正常表格的token
+  if (process.env.TEMP_APP_ID === process.env.APP_ID && process.env.TEMP_APP_SECRET === process.env.APP_SECRET) {
+    return await getTenantAccessToken();
+  }
+
+  // 检查缓存的临时token是否存在且未过期（预留5分钟的缓冲时间）
+  const now = Date.now();
+  if (cachedTempToken && tempTokenExpireTime && now < tempTokenExpireTime - 5 * 60 * 1000) {
+    console.log('使用缓存的临时表格tenant_access_token');
+    return cachedTempToken;
+  }
+
   try {
-    const response = await axios.get(
-      `https://open.feishu.cn/open-apis/bitable/v1/apps/${process.env.APP_TOKEN}/tables/${process.env.TABLE_ID}/records`,
+    const tempAppId = process.env.TEMP_APP_ID || process.env.APP_ID;
+    const tempAppSecret = process.env.TEMP_APP_SECRET || process.env.APP_SECRET;
+    
+    console.log('重新获取临时表格tenant_access_token', tempAppId);
+    const response = await axios.post(
+      'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal',
+      {
+        app_id: tempAppId,
+        app_secret: tempAppSecret
+      },
       {
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json; charset=utf-8'
-        },
-        params: {
-          page_size: 100 // 获取更多数据
         }
       }
     );
 
     if (response.data.code === 0) {
-      return response.data.data.items;
+      // 缓存token和过期时间（飞书token有效期为2小时）
+      cachedTempToken = response.data.tenant_access_token;
+      // 计算过期时间（当前时间 + token有效期(秒) * 1000）
+      tempTokenExpireTime = now + response.data.expire * 1000;
+      return cachedTempToken;
     } else {
-      console.error('获取多维表格数据失败:', response.data);
-      throw new Error(`获取多维表格数据失败: ${response.data.msg}`);
+      console.error('获取临时表格tenant_access_token失败:', response.data);
+      throw new Error(`获取临时表格tenant_access_token失败: ${response.data.msg}`);
     }
   } catch (error) {
+    console.error('获取临时表格tenant_access_token异常:', error);
+    console.error('获取临时表格tenant_access_token异常:', error.message);
+    throw error;
+  }
+}
+
+// 获取多维表格数据（支持分页，获取所有数据）
+async function getBitableData(token, tableId = null) {
+  try {
+    const targetTableId = tableId || process.env.TABLE_ID;
+    let allItems = [];
+    let pageToken = null;
+    let hasMore = true;
+    
+    // 循环获取所有分页数据
+    while (hasMore) {
+      const params = {
+        page_size: 100 // 每页最多100条
+      };
+      if (pageToken) {
+        params.page_token = pageToken;
+      }
+      
+      const response = await axios.get(
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${process.env.APP_TOKEN}/tables/${targetTableId}/records`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json; charset=utf-8'
+          },
+          params: params
+        }
+      );
+
+      if (response.data.code === 0) {
+        const items = response.data.data.items || [];
+        allItems = allItems.concat(items);
+        
+        // 检查是否还有更多数据
+        hasMore = response.data.data.has_more || false;
+        pageToken = response.data.data.page_token || null;
+        
+        // 如果没有更多数据或没有page_token，退出循环
+        if (!hasMore || !pageToken) {
+          break;
+        }
+      } else {
+        console.error('获取多维表格数据失败:', response.data);
+        throw new Error(`获取多维表格数据失败: ${response.data.msg}`);
+      }
+    }
+    
+    console.log(`成功获取 ${allItems.length} 条多维表格数据`);
+    return allItems;
+  } catch (error) {
     console.error('获取多维表格数据异常:', error.message);
+    throw error;
+  }
+}
+
+// 获取临时表格数据（支持分页）
+async function getTempBitableData(pageToken = null, pageSize = 20) {
+  try {
+    const token = await getTempTenantAccessToken();
+    const tempAppToken = process.env.TEMP_APP_TOKEN || process.env.APP_TOKEN;
+    
+    const params = {
+      page_size: pageSize
+    };
+    if (pageToken) {
+      params.page_token = pageToken;
+    }
+
+    const response = await axios.get(
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${tempAppToken}/tables/${process.env.TEMP_TABLE_ID}/records`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json; charset=utf-8'
+        },
+        params: params
+      }
+    );
+
+    if (response.data.code === 0) {
+      return {
+        items: response.data.data.items || [],
+        hasMore: response.data.data.has_more || false,
+        pageToken: response.data.data.page_token || null
+      };
+    } else {
+      console.error('获取临时表格数据失败:', response.data);
+      throw new Error(`获取临时表格数据失败: ${response.data.msg}`);
+    }
+  } catch (error) {
+    console.error('获取临时表格数据异常:', error.message);
+    throw error;
+  }
+}
+
+// 在临时表格中创建记录
+async function createTempBitableRecord(fields) {
+  try {
+    const token = await getTempTenantAccessToken();
+    const tempAppToken = process.env.TEMP_APP_TOKEN || process.env.APP_TOKEN;
+    
+    const response = await axios.post(
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${tempAppToken}/tables/${process.env.TEMP_TABLE_ID}/records`,
+      { fields },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json; charset=utf-8'
+        }
+      }
+    );
+
+    if (response.data.code === 0) {
+      return response.data.data;
+    } else {
+      console.error('创建临时表格记录失败:', response.data);
+      throw new Error(`创建临时表格记录失败: ${response.data.msg}`);
+    }
+  } catch (error) {
+    console.error('创建临时表格记录异常:', error.message);
+    throw error;
+  }
+}
+
+// 在正常表格中创建记录
+async function createBitableRecord(token, fields) {
+  try {
+    const response = await axios.post(
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${process.env.APP_TOKEN}/tables/${process.env.TABLE_ID}/records`,
+      { fields },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json; charset=utf-8'
+        }
+      }
+    );
+
+    if (response.data.code === 0) {
+      return response.data.data;
+    } else {
+      console.error('创建表格记录失败:', response.data);
+      throw new Error(`创建表格记录失败: ${response.data.msg}`);
+    }
+  } catch (error) {
+    console.error('创建表格记录异常:', error.message);
+    throw error;
+  }
+}
+
+// 删除临时表格记录
+async function deleteTempBitableRecord(recordId) {
+  try {
+    const token = await getTempTenantAccessToken();
+    const tempAppToken = process.env.TEMP_APP_TOKEN || process.env.APP_TOKEN;
+    
+    const response = await axios.delete(
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${tempAppToken}/tables/${process.env.TEMP_TABLE_ID}/records/${recordId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json; charset=utf-8'
+        }
+      }
+    );
+
+    if (response.data.code === 0) {
+      return response.data.data;
+    } else {
+      console.error('删除临时表格记录失败:', response.data);
+      throw new Error(`删除临时表格记录失败: ${response.data.msg}`);
+    }
+  } catch (error) {
+    console.error('删除临时表格记录异常:', error.message);
     throw error;
   }
 }
@@ -135,14 +337,27 @@ function processTableData(items) {
   // 提取记录并按分类分组
   const records = items.map(item => {
     const fields = item.fields;
+    
+    // 获取站点名称
+    const name = fields.name || fields.站点名称 || '';
+    
+    // 获取网址（处理链接类型和字符串类型）
+    let url = '';
+    if (fields.url) {
+      url = typeof fields.url === 'string' ? fields.url : (fields.url.link || '');
+    } else if (fields.网址) {
+      url = typeof fields.网址 === 'string' ? fields.网址 : (fields.网址.link || '');
+    }
+    
     // 如果站点名称和网址都为空，则跳过该记录
-    if ((!fields.name && !fields.站点名称) && (!fields.url && !fields.网址)) {
+    if (!name.trim() && !url.trim()) {
       return null;
     }
+    
     return {
       id: item.record_id, // 添加记录ID
-      name: fields.name || fields.站点名称 || '',
-      url: fields.url || fields.网址.link || '',
+      name: name,
+      url: url,
       category: fields.category || fields.分类 || '其它',
       sort: fields.sort || fields.排序 || 0,
       icon: fields?.icon?.link || fields?.备用图标?.link || ''
@@ -381,8 +596,8 @@ app.get(`${BASE_PATH}/`, (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// 添加新的网站链接（需要验证）
-app.post(`${BASE_PATH}/api/links`, requireAuth, async (req, res) => {
+// 添加新的网站链接（游客申请存储到临时表格，管理员直接存储到正常表格）
+app.post(`${BASE_PATH}/api/links`, async (req, res) => {
   try {
     // 解析请求体
     let requestBody = req.body;
@@ -435,46 +650,43 @@ app.post(`${BASE_PATH}/api/links`, requireAuth, async (req, res) => {
       });
     }
     
-    // 获取飞书访问令牌
-    const token = await getTenantAccessToken();
+    // 检查用户是否已登录
+    const isAuthenticated = req.session && req.session.authenticated;
     
     // 构建请求体，符合飞书多维表格API的要求
-    const createRecordBody = {
-      fields: {
-        '分类': requestBody.category,
-        '排序': requestBody.sort || 200, // 默认排序值
-        '站点名称': requestBody.name,
-        '网址': {
-          'link': requestBody.url,
-          'text': requestBody.name
-        }
+    const fields = {
+      '分类': requestBody.category,
+      '排序': requestBody.sort || 200, // 默认排序值
+      '站点名称': requestBody.name,
+      '网址': {
+        'link': requestBody.url,
+        'text': requestBody.name
       }
     };
     
-    // 调用飞书多维表格API创建记录
-    const response = await axios.post(
-      `https://open.feishu.cn/open-apis/bitable/v1/apps/${process.env.APP_TOKEN}/tables/${process.env.TABLE_ID}/records`,
-      createRecordBody,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json; charset=utf-8'
-        }
-      }
-    );
-    
-    // 处理响应
-    if (response.data.code === 0) {
+    let result;
+    if (isAuthenticated) {
+      // 管理员：直接存储到正常表格
+      const token = await getTenantAccessToken();
+      result = await createBitableRecord(token, fields);
       res.json({
         success: true,
         message: '链接添加成功',
-        data: response.data.data
+        data: result
       });
     } else {
-      console.error('飞书API错误:', response.data);
-      res.status(500).json({
-        success: false,
-        message: `添加链接失败: ${response.data.msg || '未知错误'}`
+      // 游客：存储到临时表格
+      if (!process.env.TEMP_TABLE_ID) {
+        return res.status(500).json({
+          success: false,
+          message: '临时表格未配置，请联系管理员'
+        });
+      }
+      result = await createTempBitableRecord(fields);
+      res.json({
+        success: true,
+        message: '申请已提交，等待管理员审核',
+        data: result
       });
     }
   } catch (error) {
@@ -482,6 +694,230 @@ app.post(`${BASE_PATH}/api/links`, requireAuth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: `添加链接失败: ${error.message}`
+    });
+  }
+});
+
+// 处理临时表格数据
+function processTempTableData(items) {
+  return items.map(item => {
+    const fields = item.fields;
+    return {
+      id: item.record_id,
+      name: fields.name || fields.站点名称 || '',
+      url: fields.url || fields.网址?.link || '',
+      category: fields.category || fields.分类 || '其它',
+      sort: fields.sort || fields.排序 || 0,
+      icon: fields?.icon?.link || fields?.备用图标?.link || '',
+      createdAt: item.created_time || item.created_at || ''
+    };
+  }).filter(record => record.name || record.url); // 过滤掉空记录
+}
+
+// 获取待审核链接列表（公开接口，游客可查看）
+app.get(`${BASE_PATH}/api/pending-links-public`, async (req, res) => {
+  try {
+    if (!process.env.TEMP_TABLE_ID) {
+      return res.status(500).json({
+        success: false,
+        message: '临时表格未配置'
+      });
+    }
+
+    const result = await getTempBitableData(null, 100); // 游客最多查看100条
+    
+    const processedItems = processTempTableData(result.items);
+
+    res.json({
+      success: true,
+      data: processedItems
+    });
+  } catch (error) {
+    console.error('获取待审核链接异常:', error.message);
+    res.status(500).json({
+      success: false,
+      message: `获取待审核链接失败: ${error.message}`
+    });
+  }
+});
+
+// 获取待审核链接列表（需要验证，支持分页）
+app.get(`${BASE_PATH}/api/pending-links`, requireAuth, async (req, res) => {
+  try {
+    const pageToken = req.query.page_token || null;
+    const pageSize = parseInt(req.query.page_size) || 20;
+
+    if (!process.env.TEMP_TABLE_ID) {
+      return res.status(500).json({
+        success: false,
+        message: '临时表格未配置'
+      });
+    }
+
+    const result = await getTempBitableData(pageToken, pageSize);
+    
+    const processedItems = processTempTableData(result.items);
+
+    res.json({
+      success: true,
+      data: processedItems,
+      pagination: {
+        hasMore: result.hasMore,
+        pageToken: result.pageToken
+      }
+    });
+  } catch (error) {
+    console.error('获取待审核链接异常:', error.message);
+    res.status(500).json({
+      success: false,
+      message: `获取待审核链接失败: ${error.message}`
+    });
+  }
+});
+
+// 同意申请（同步到正常表格，删除临时表格数据，需要验证）
+app.post(`${BASE_PATH}/api/pending-links/:id/approve`, requireAuth, async (req, res) => {
+  try {
+    const recordId = req.params.id;
+    
+    if (!recordId) {
+      return res.status(400).json({
+        success: false,
+        message: '记录ID不能为空'
+      });
+    }
+
+    if (!process.env.TEMP_TABLE_ID) {
+      return res.status(500).json({
+        success: false,
+        message: '临时表格未配置'
+      });
+    }
+
+    // 1. 从临时表格获取记录数据
+    const tempToken = await getTempTenantAccessToken();
+    const tempAppToken = process.env.TEMP_APP_TOKEN || process.env.APP_TOKEN;
+    
+    const tempResponse = await axios.get(
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${tempAppToken}/tables/${process.env.TEMP_TABLE_ID}/records/${recordId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${tempToken}`,
+          'Content-Type': 'application/json; charset=utf-8'
+        }
+      }
+    );
+
+    if (tempResponse.data.code !== 0) {
+      return res.status(404).json({
+        success: false,
+        message: '未找到待审核记录'
+      });
+    }
+
+    const tempFields = tempResponse.data.data.record.fields;
+    
+    // 2. 构建正常表格的字段
+    // 处理字段名称的兼容性（支持中英文字段名）
+    const category = tempFields.分类 || tempFields.category || '其它';
+    const sort = Number(tempFields.排序 || tempFields.sort || 200);
+    const name = tempFields.站点名称 || tempFields.name || '';
+    
+    // 处理网址字段（可能是链接类型或字符串）
+    let urlField;
+    if (tempFields.网址) {
+      if (typeof tempFields.网址 === 'object' && tempFields.网址.link) {
+        // 链接类型
+        urlField = {
+          'link': tempFields.网址.link,
+          'text': name || tempFields.网址.text || ''
+        };
+      } else if (typeof tempFields.网址 === 'string') {
+        // 字符串类型
+        urlField = {
+          'link': tempFields.网址,
+          'text': name
+        };
+      }
+    } else if (tempFields.url) {
+      if (typeof tempFields.url === 'object' && tempFields.url.link) {
+        urlField = {
+          'link': tempFields.url.link,
+          'text': name || tempFields.url.text || ''
+        };
+      } else if (typeof tempFields.url === 'string') {
+        urlField = {
+          'link': tempFields.url,
+          'text': name
+        };
+      }
+    }
+    
+    if (!urlField || !urlField.link) {
+      return res.status(400).json({
+        success: false,
+        message: '网址字段无效'
+      });
+    }
+    
+    const fields = {
+      '分类': category,
+      '排序': sort,
+      '站点名称': name,
+      '网址': urlField
+    };
+
+    // 3. 创建到正常表格
+    const token = await getTenantAccessToken();
+    await createBitableRecord(token, fields);
+
+    // 4. 删除临时表格记录
+    await deleteTempBitableRecord(recordId);
+
+    res.json({
+      success: true,
+      message: '申请已同意，链接已添加到导航'
+    });
+  } catch (error) {
+    console.error('同意申请异常:', error.message);
+    res.status(500).json({
+      success: false,
+      message: `同意申请失败: ${error.message}`
+    });
+  }
+});
+
+// 拒绝申请（删除临时表格数据，需要验证）
+app.post(`${BASE_PATH}/api/pending-links/:id/reject`, requireAuth, async (req, res) => {
+  try {
+    const recordId = req.params.id;
+    
+    if (!recordId) {
+      return res.status(400).json({
+        success: false,
+        message: '记录ID不能为空'
+      });
+    }
+
+    if (!process.env.TEMP_TABLE_ID) {
+      return res.status(500).json({
+        success: false,
+        message: '临时表格未配置'
+      });
+    }
+
+    // 删除临时表格记录
+    await deleteTempBitableRecord(recordId);
+
+    res.json({
+      success: true,
+      message: '申请已拒绝'
+    });
+  } catch (error) {
+    console.error('拒绝申请异常:', error.message);
+    res.status(500).json({
+      success: false,
+      message: `拒绝申请失败: ${error.message}`
     });
   }
 });

@@ -161,14 +161,8 @@ class DataManager {
 
   // 添加链接
   async addLink(linkData) {
-    // 检查验证状态
-    if (window.authManager && !(await window.authManager.requireAuth())) {
-      return {
-        success: false,
-        message: '需要验证，请先登录',
-        requiresAuth: true
-      };
-    }
+    // 游客也可以申请添加链接，不需要验证
+    // 管理员添加的链接会直接生效，游客申请的链接需要管理员审核
 
     try {
       const basePath = window.BASE_PATH || '';

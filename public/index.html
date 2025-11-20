@@ -83,6 +83,9 @@
         <span>水果导航</span>
       </div>
       <div class="mobile-actions">
+        <button id="review-btn-mobile" class="review-button login-button" title="游客申请" style="display: none;">
+          <i class="bi bi-clock-history"></i>
+        </button>
         <button id="login-btn-mobile" class="login-button" title="登录">
           <i class="bi bi-lock"></i>
         </button>
@@ -95,6 +98,10 @@
 
   <!-- 右上角操作按钮（桌面端显示） -->
   <div class="desktop-actions desktop-only">
+    <button id="review-btn-desktop" class="review-button login-button" title="游客申请" style="display: none;">
+      <i class="bi bi-clock-history"></i>
+      <span id="review-status-text">游客申请</span>
+    </button>
     <button id="login-btn-desktop" class="login-button" title="登录">
       <i class="bi bi-lock"></i>
       <span id="login-status-text">登录</span>
@@ -209,7 +216,7 @@
       </header>
 
     <!-- 添加链接按钮 -->
-    <button id="add-link-btn" class="add-link-btn">
+    <button id="add-link-btn" class="add-link-btn" title="添加网站">
       <i class="bi bi-plus"></i>
     </button>
     
@@ -322,6 +329,28 @@
     <div class="modal-footer">
       <button id="cancel-login-btn" class="cancel-btn">取消</button>
       <button id="submit-login-btn" class="save-btn">登录</button>
+    </div>
+  </div>
+</div>
+
+<!-- 管理员审核模态框 -->
+<div id="admin-review-modal" class="modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content admin-review-modal-content">
+    <div class="modal-header">
+      <h2>待审核链接管理</h2>
+      <button id="close-admin-review-modal-btn" class="close-modal-btn" aria-label="关闭">
+        <i class="bi bi-x"></i>
+      </button>
+    </div>
+    
+    <div class="modal-body admin-review-modal-body">
+      <div id="admin-pending-links-container">
+        <div class="loading-state">
+          <i class="bi bi-hourglass-split"></i>
+          <p>加载中...</p>
+        </div>
+      </div>
     </div>
   </div>
 </div>

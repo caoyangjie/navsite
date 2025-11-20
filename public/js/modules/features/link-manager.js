@@ -146,10 +146,8 @@ class LinkManager {
 
   // 显示添加模态框
   async showAddModal() {
-    // 检查验证状态
-    if (window.authManager && !(await window.authManager.requireAuth())) {
-      return; // 如果未验证，requireAuth会显示登录模态框
-    }
+    // 游客也可以申请添加链接，不需要验证
+    // 管理员添加的链接会直接生效，游客申请的链接需要管理员审核
 
     const addLinkModal = document.getElementById('add-link-modal');
     const addLinkForm = document.getElementById('add-link-form');
