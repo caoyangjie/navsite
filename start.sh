@@ -1,0 +1,2 @@
+./manager.sh start
+
