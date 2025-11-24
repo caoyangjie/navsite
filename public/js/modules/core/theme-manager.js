@@ -442,10 +442,10 @@ class ThemeManager {
         if (icon) {
           if (this.currentMode === 'dark') {
             icon.className = 'bi bi-sun';
-            themeToggleBtn.title = '';
+            themeToggleBtn.title = '切换亮色模式';
           } else {
             icon.className = 'bi bi-moon';
-            themeToggleBtn.title = '';
+            themeToggleBtn.title = '切换暗黑模式';
           }
         }
       }

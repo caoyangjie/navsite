@@ -1,0 +1,41 @@
+[
+  {
+    "field_name": "描述",
+    "type": 1
+  },
+  {
+    "field_name": "description",
+    "type": 1
+  },
+  {
+    "field_name": "详细介绍",
+    "type": 1
+  },
+  {
+    "field_name": "fullDescription",
+    "type": 1
+  },
+  {
+    "field_name": "图标",
+    "type": 1
+  },
+  {
+    "field_name": "icon",
+    "type": 1
+  },
+  {
+    "field_name": "分类",
+    "type": 3,
+    "property": {
+      "options": []
+    }
+  },
+  {
+    "field_name": "category",
+    "type": 3,
+    "property": {
+      "options": []
+    }
+  }
+]
+

@@ -164,6 +164,9 @@ class LinkManager {
     // 清空表单
     addLinkForm.reset();
     this.clearErrors();
+    
+    // 检查用户是否已登录，如果已登录则加载表格列表
+    await this.loadAvailableTables();
 
     // 控制自定义分类输入框的显示/隐藏
     const categorySelect = document.getElementById('site-category');
@@ -208,6 +211,75 @@ class LinkManager {
     addLinkModal.classList.remove('active');
     document.body.style.overflow = '';
     this.clearErrors();
+  }
+
+  // 加载可用的表格列表（仅管理员）
+  async loadAvailableTables() {
+    const tableGroup = document.getElementById('site-table-group');
+    const tableSelect = document.getElementById('site-table');
+    
+    if (!tableGroup || !tableSelect) return;
+    
+    try {
+      // 检查用户是否已登录
+      const basePath = window.BASE_PATH || '';
+      const authResponse = await fetch(`${basePath}/api/auth/status`, {
+        method: 'GET',
+        credentials: 'include'
+      });
+      
+      if (!authResponse.ok) {
+        tableGroup.style.display = 'none';
+        return;
+      }
+      
+      const authResult = await authResponse.json();
+      if (!authResult.authenticated) {
+        tableGroup.style.display = 'none';
+        return;
+      }
+      
+      // 用户已登录，加载表格列表
+      const response = await fetch(`${basePath}/api/bitables/available`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        console.warn('获取表格列表失败，使用默认表格');
+        tableGroup.style.display = 'none';
+        return;
+      }
+      
+      const result = await response.json();
+      
+      if (result.success && result.data && result.data.length > 0) {
+        // 清空现有选项（保留默认选项）
+        tableSelect.innerHTML = '<option value="tbl3I3RtxgtiC7eF">默认表格</option>';
+        
+        // 添加表格选项
+        result.data.forEach(table => {
+          if (table.table_id && table.table_id !== 'tbl3I3RtxgtiC7eF') {
+            const option = document.createElement('option');
+            option.value = table.table_id;
+            option.textContent = table.table_name || table.table_id;
+            tableSelect.appendChild(option);
+          }
+        });
+        
+        // 显示表格选择框
+        tableGroup.style.display = 'block';
+      } else {
+        // 没有可用表格，隐藏选择框
+        tableGroup.style.display = 'none';
+      }
+    } catch (error) {
+      console.error('加载表格列表失败:', error);
+      tableGroup.style.display = 'none';
+    }
   }
 
   // 清除所有错误提示
@@ -301,11 +373,18 @@ class LinkManager {
       finalCategory = customCategory;
     }
     
+    // 获取选择的表格ID（仅管理员）
+    const siteTableSelect = document.getElementById('site-table');
+    const tableId = siteTableSelect && siteTableSelect.style.display !== 'none' 
+      ? (siteTableSelect.value || 'tbl3I3RtxgtiC7eF')
+      : 'tbl3I3RtxgtiC7eF'; // 默认表格
+    
     const formData = {
       name: siteName,
       url: siteUrl,
       category: finalCategory,
-      sort: siteSort
+      sort: siteSort,
+      table_id: tableId
     };
 
     // 禁用保存按钮，防止重复提交

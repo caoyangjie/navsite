@@ -133,9 +133,10 @@ async function getTempTenantAccessToken() {
 }
 
 // 获取多维表格数据（支持分页，获取所有数据）
-async function getBitableData(token, tableId = null) {
+async function getBitableData(token, tableId = null, appToken = null) {
   try {
-    const targetTableId = tableId || process.env.TABLE_ID;
+    const targetTableId = tableId || process.env.TABLE_ID || 'tbl3I3RtxgtiC7eF';
+    const targetAppToken = appToken || process.env.APP_TOKEN;
     let allItems = [];
     let pageToken = null;
     let hasMore = true;
@@ -150,7 +151,7 @@ async function getBitableData(token, tableId = null) {
       }
       
       const response = await axios.get(
-        `https://open.feishu.cn/open-apis/bitable/v1/apps/${process.env.APP_TOKEN}/tables/${targetTableId}/records`,
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${targetAppToken}/tables/${targetTableId}/records`,
         {
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -178,7 +179,7 @@ async function getBitableData(token, tableId = null) {
       }
     }
     
-    console.log(`成功获取 ${allItems.length} 条多维表格数据`);
+    console.log(`成功获取 ${allItems.length} 条多维表格数据 (App: ${targetAppToken}, Table: ${targetTableId})`);
     return allItems;
   } catch (error) {
     console.error('获取多维表格数据异常:', error.message);
@@ -256,10 +257,14 @@ async function createTempBitableRecord(fields) {
 }
 
 // 在正常表格中创建记录
-async function createBitableRecord(token, fields) {
+async function createBitableRecord(token, fields, appToken = null, tableId = null) {
   try {
+    // 使用传入的参数，如果没有则使用环境变量中的默认值
+    const targetAppToken = appToken || process.env.APP_TOKEN;
+    const targetTableId = tableId || process.env.TABLE_ID || 'tbl3I3RtxgtiC7eF';
+    
     const response = await axios.post(
-      `https://open.feishu.cn/open-apis/bitable/v1/apps/${process.env.APP_TOKEN}/tables/${process.env.TABLE_ID}/records`,
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${targetAppToken}/tables/${targetTableId}/records`,
       { fields },
       {
         headers: {
@@ -359,34 +364,84 @@ function getLunarDateString() {
 }
 
 // 处理多维表格数据
-function processTableData(items) {
+function processTableData(items, tableId = null) {
+  const normalizeFieldValue = (value) => {
+    if (value === null || value === undefined) {
+      return '';
+    }
+    if (typeof value === 'string') {
+      return value.trim();
+    }
+    if (typeof value === 'number') {
+      return value.toString();
+    }
+    if (typeof value === 'boolean') {
+      return value ? 'true' : 'false';
+    }
+    if (Array.isArray(value)) {
+      return value
+        .map(v => normalizeFieldValue(v))
+        .filter(Boolean)
+        .join(' ');
+    }
+    if (typeof value === 'object') {
+      if (value.link) {
+        return String(value.link).trim();
+      }
+      if (value.text) {
+        return String(value.text).trim();
+      }
+      if (value.value) {
+        return String(value.value).trim();
+      }
+    }
+    return '';
+  };
+
+  const pickFieldValue = (fields, candidates) => {
+    for (const key of candidates) {
+      if (fields[key] !== undefined && fields[key] !== null) {
+        const normalized = normalizeFieldValue(fields[key]);
+        if (normalized) {
+          return normalized;
+        }
+      }
+    }
+    return '';
+  };
+
   // 提取记录并按分类分组
   const records = items.map(item => {
-    const fields = item.fields;
+    const fields = item.fields || {};
     
     // 获取站点名称
-    const name = fields.name || fields.站点名称 || '';
+    const name = pickFieldValue(fields, ['name', '站点名称', '网站名称', '名称']);
     
     // 获取网址（处理链接类型和字符串类型）
-    let url = '';
-    if (fields.url) {
-      url = typeof fields.url === 'string' ? fields.url : (fields.url.link || '');
-    } else if (fields.网址) {
-      url = typeof fields.网址 === 'string' ? fields.网址 : (fields.网址.link || '');
-    }
+    const url = pickFieldValue(fields, ['url', '网址', 'URL']);
     
     // 如果站点名称和网址都为空，则跳过该记录
     if (!name.trim() && !url.trim()) {
       return null;
     }
+
+    const category = pickFieldValue(fields, ['category', '分类']) || '其它';
+    const sortRaw = fields.sort ?? fields.排序 ?? 0;
+    const sort = typeof sortRaw === 'number' ? sortRaw : parseInt(sortRaw, 10) || 0;
+    const description = pickFieldValue(fields, ['description', '描述']) || '';
+    const fullDescription = pickFieldValue(fields, ['fullDescription', '详细介绍']) || '';
+    const icon = pickFieldValue(fields, ['icon', '图标', '备用图标']) || '';
     
     return {
       id: item.record_id, // 添加记录ID
-      name: name,
-      url: url,
-      category: fields.category || fields.分类 || '其它',
-      sort: fields.sort || fields.排序 || 0,
-      icon: fields?.icon?.link || fields?.备用图标?.link || ''
+      name,
+      url,
+      category,
+      sort,
+      icon,
+      description,
+      fullDescription,
+      tableId: tableId || ''
     };
   }).filter(record => record !== null); // 过滤掉空记录
 
@@ -407,31 +462,44 @@ function processTableData(items) {
   return groupedByCategory;
 }
 
+function createMockItem(item) {
+  const name = item.name || '示例网站';
+  const defaultDescription = `${name} 是一个示例导航站点，用于展示数据结构。`;
+  const defaultFullDescription = `<p>${name} 是一个示例站点，用于展示详情页面的渲染效果。</p>`;
+  
+  return {
+    ...item,
+    description: item.description || defaultDescription,
+    fullDescription: item.fullDescription || defaultFullDescription,
+    tableId: item.tableId || 'tbl3I3RtxgtiC7eF'
+  };
+}
+
 // 模拟数据（当无法连接飞书API时使用）
 const mockData = {
   'Code': [
-    { id: 'mock_001', name: 'GitHub', url: 'https://github.com', category: 'Code', sort: 1, icon: 'bi-github' },
-    { id: 'mock_002', name: 'Stack Overflow', url: 'https://stackoverflow.com', category: 'Code', sort: 2, icon: 'bi-stack-overflow' },
-    { id: 'mock_003', name: 'VSCode', url: 'https://code.visualstudio.com', category: 'Code', sort: 3, icon: 'bi-code-square' },
-    { id: 'mock_004', name: 'CodePen', url: 'https://codepen.io', category: 'Code', sort: 4, icon: 'bi-code-slash' }
+    createMockItem({ id: 'mock_001', name: 'GitHub', url: 'https://github.com', category: 'Code', sort: 1, icon: 'bi-github' }),
+    createMockItem({ id: 'mock_002', name: 'Stack Overflow', url: 'https://stackoverflow.com', category: 'Code', sort: 2, icon: 'bi-stack-overflow' }),
+    createMockItem({ id: 'mock_003', name: 'VSCode', url: 'https://code.visualstudio.com', category: 'Code', sort: 3, icon: 'bi-code-square' }),
+    createMockItem({ id: 'mock_004', name: 'CodePen', url: 'https://codepen.io', category: 'Code', sort: 4, icon: 'bi-code-slash' })
   ],
   '设计': [
-    { id: 'mock_005', name: 'Figma', url: 'https://figma.com', category: '设计', sort: 1, icon: 'bi-palette' },
-    { id: 'mock_006', name: 'Dribbble', url: 'https://dribbble.com', category: '设计', sort: 2, icon: 'bi-dribbble' },
-    { id: 'mock_007', name: 'Behance', url: 'https://behance.net', category: '设计', sort: 3, icon: 'bi-brush' },
-    { id: 'mock_008', name: 'Unsplash', url: 'https://unsplash.com', category: '设计', sort: 4, icon: 'bi-image' }
+    createMockItem({ id: 'mock_005', name: 'Figma', url: 'https://figma.com', category: '设计', sort: 1, icon: 'bi-palette' }),
+    createMockItem({ id: 'mock_006', name: 'Dribbble', url: 'https://dribbble.com', category: '设计', sort: 2, icon: 'bi-dribbble' }),
+    createMockItem({ id: 'mock_007', name: 'Behance', url: 'https://behance.net', category: '设计', sort: 3, icon: 'bi-brush' }),
+    createMockItem({ id: 'mock_008', name: 'Unsplash', url: 'https://unsplash.com', category: '设计', sort: 4, icon: 'bi-image' })
   ],
   '产品': [
-    { id: 'mock_009', name: 'ProductHunt', url: 'https://producthunt.com', category: '产品', sort: 1, icon: 'bi-graph-up' },
-    { id: 'mock_010', name: 'Trello', url: 'https://trello.com', category: '产品', sort: 2, icon: 'bi-kanban' },
-    { id: 'mock_011', name: 'Notion', url: 'https://notion.so', category: '产品', sort: 3, icon: 'bi-journal-text' },
-    { id: 'mock_012', name: 'Asana', url: 'https://asana.com', category: '产品', sort: 4, icon: 'bi-list-check' }
+    createMockItem({ id: 'mock_009', name: 'ProductHunt', url: 'https://producthunt.com', category: '产品', sort: 1, icon: 'bi-graph-up' }),
+    createMockItem({ id: 'mock_010', name: 'Trello', url: 'https://trello.com', category: '产品', sort: 2, icon: 'bi-kanban' }),
+    createMockItem({ id: 'mock_011', name: 'Notion', url: 'https://notion.so', category: '产品', sort: 3, icon: 'bi-journal-text' }),
+    createMockItem({ id: 'mock_012', name: 'Asana', url: 'https://asana.com', category: '产品', sort: 4, icon: 'bi-list-check' })
   ],
   '其它': [
-    { id: 'mock_013', name: '百度', url: 'https://baidu.com', category: '其它', sort: 1, icon: 'bi-search' },
-    { id: 'mock_014', name: '微博', url: 'https://weibo.com', category: '其它', sort: 2, icon: 'bi-chat-dots' },
-    { id: 'mock_015', name: '知乎', url: 'https://zhihu.com', category: '其它', sort: 3, icon: 'bi-question-circle' },
-    { id: 'mock_016', name: 'B站', url: 'https://bilibili.com', category: '其它', sort: 4, icon: 'bi-play-btn' }
+    createMockItem({ id: 'mock_013', name: '百度', url: 'https://baidu.com', category: '其它', sort: 1, icon: 'bi-search' }),
+    createMockItem({ id: 'mock_014', name: '微博', url: 'https://weibo.com', category: '其它', sort: 2, icon: 'bi-chat-dots' }),
+    createMockItem({ id: 'mock_015', name: '知乎', url: 'https://zhihu.com', category: '其它', sort: 3, icon: 'bi-question-circle' }),
+    createMockItem({ id: 'mock_016', name: 'B站', url: 'https://bilibili.com', category: '其它', sort: 4, icon: 'bi-play-btn' })
   ]
 };
 
@@ -441,11 +509,56 @@ app.get(`${BASE_PATH}/api/navigation`, async (req, res) => {
     let data;
     let categories;
     let isMockData = false;
+    
+    // 获取指定的表格ID（从查询参数中获取）
+    const tableId = req.query.table_id || null;
+    let targetAppToken = process.env.APP_TOKEN;
+    let targetTableId = tableId || process.env.TABLE_ID || 'tbl3I3RtxgtiC7eF';
+    
+    // 如果指定了table_id，需要从MM_TABLE_ID中查找对应的app_token
+    if (tableId && tableId !== 'tbl3I3RtxgtiC7eF') {
+      if (process.env.MM_TABLE_ID) {
+        try {
+          const token = await getTenantAccessToken();
+          const mmAppToken = process.env.MM_APP_TOKEN || process.env.APP_TOKEN;
+          const mmResponse = await axios.get(
+            `https://open.feishu.cn/open-apis/bitable/v1/apps/${mmAppToken}/tables/${process.env.MM_TABLE_ID}/records`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json; charset=utf-8'
+              },
+              params: {
+                page_size: 100
+              }
+            }
+          );
+          
+          if (mmResponse.data.code === 0 && mmResponse.data.data.items) {
+            const targetTable = mmResponse.data.data.items.find(item => {
+              const fields = item.fields;
+              return (fields['tableId'] || fields['表格ID']) === tableId;
+            });
+            
+            if (targetTable) {
+              const tableFields = targetTable.fields;
+              targetAppToken = tableFields['token'] || tableFields['应用Token'] || process.env.APP_TOKEN;
+              targetTableId = tableFields['tableId'] || tableFields['表格ID'] || tableId;
+              console.log('从MM_TABLE_ID找到表格，App Token:', targetAppToken, 'Table ID:', targetTableId);
+            }
+          }
+        } catch (mmError) {
+          console.warn('查找表格信息失败，使用默认表格:', mmError.message);
+          targetTableId = 'tbl3I3RtxgtiC7eF';
+        }
+      }
+    }
+    
     // 尝试从飞书API获取数据
     try {
       const token = await getTenantAccessToken();
-      const items = await getBitableData(token);
-      data = processTableData(items);
+      const items = await getBitableData(token, targetTableId, targetAppToken);
+      data = processTableData(items, targetTableId);
       categories = Object.keys(data);
     } catch (apiError) {
       console.log('无法从飞书API获取数据，使用模拟数据:', apiError.message);
@@ -692,9 +805,51 @@ app.post(`${BASE_PATH}/api/links`, async (req, res) => {
     
     let result;
     if (isAuthenticated) {
-      // 管理员：直接存储到正常表格
+      // 管理员：从MM_TABLE_ID中选择表格存储，或使用默认表格
       const token = await getTenantAccessToken();
-      result = await createBitableRecord(token, fields);
+      
+      // 获取目标表格ID和App Token
+      let targetTableId = requestBody.table_id || 'tbl3I3RtxgtiC7eF'; // 默认表格
+      let targetAppToken = process.env.APP_TOKEN;
+      
+      // 如果指定了table_id，需要从MM_TABLE_ID中查找对应的app_token
+      if (requestBody.table_id && requestBody.table_id !== 'tbl3I3RtxgtiC7eF') {
+        if (process.env.MM_TABLE_ID) {
+          try {
+            const mmAppToken = process.env.MM_APP_TOKEN || process.env.APP_TOKEN;
+            const mmResponse = await axios.get(
+              `https://open.feishu.cn/open-apis/bitable/v1/apps/${mmAppToken}/tables/${process.env.MM_TABLE_ID}/records`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json; charset=utf-8'
+                },
+                params: {
+                  page_size: 100
+                }
+              }
+            );
+            
+            if (mmResponse.data.code === 0 && mmResponse.data.data.items) {
+              const targetTable = mmResponse.data.data.items.find(item => {
+                const fields = item.fields;
+                return (fields['tableId'] || fields['表格ID']) === requestBody.table_id;
+              });
+              
+              if (targetTable) {
+                const tableFields = targetTable.fields;
+                targetAppToken = tableFields['token'] || tableFields['应用Token'] || process.env.APP_TOKEN;
+                targetTableId = tableFields['tableId'] || tableFields['表格ID'] || requestBody.table_id;
+              }
+            }
+          } catch (mmError) {
+            console.warn('查找表格信息失败，使用默认表格:', mmError.message);
+            targetTableId = 'tbl3I3RtxgtiC7eF';
+          }
+        }
+      }
+      
+      result = await createBitableRecord(token, fields, targetAppToken, targetTableId);
       res.json({
         success: true,
         message: '链接添加成功',
@@ -1085,6 +1240,618 @@ app.delete(`${BASE_PATH}/api/links/:id`, requireAuth, async (req, res) => {
     res.status(500).json({
       success: false,
       message: `删除链接失败: ${error.message}`
+    });
+  }
+});
+
+// ==================== 多维表格管理API ====================
+
+// 获取可用的多维表格列表（用于添加链接时选择，需要验证）
+app.get(`${BASE_PATH}/api/bitables/available`, async (req, res) => {
+  try {
+    if (!process.env.MM_TABLE_ID) {
+      return res.status(500).json({
+        success: false,
+        message: '多维表格元信息表未配置，请在环境变量中设置MM_TABLE_ID'
+      });
+    }
+    
+    const token = await getTenantAccessToken();
+    const mmAppToken = process.env.MM_APP_TOKEN || process.env.APP_TOKEN;
+    
+    const response = await axios.get(
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${mmAppToken}/tables/${process.env.MM_TABLE_ID}/records`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json; charset=utf-8'
+        },
+        params: {
+          page_size: 100 // 获取所有可用表格
+        }
+      }
+    );
+    
+    if (response.data.code === 0) {
+      const items = response.data.data.items || [];
+      const processedItems = items.map(item => {
+        const fields = item.fields;
+        return {
+          table_id: fields['tableId'] || fields['表格ID'] || '',
+          table_name: fields['name'] || fields['表格名称'] || '',
+          app_token: fields['token'] || fields['应用Token'] || '',
+          sort: fields['sort'] || fields['排序'] || 10
+        };
+      }).filter(item => item.table_id); // 过滤掉没有table_id的记录
+      
+      // 按sort排序
+      processedItems.sort((a, b) => a.sort - b.sort);
+      
+      res.json({
+        success: true,
+        data: processedItems
+      });
+    } else {
+      console.error('获取可用表格列表失败:', response.data);
+      res.status(500).json({
+        success: false,
+        message: `获取可用表格列表失败: ${response.data.msg || '未知错误'}`
+      });
+    }
+  } catch (error) {
+    console.error('获取可用表格列表异常:', error.message);
+    res.status(500).json({
+      success: false,
+      message: `获取可用表格列表失败: ${error.message}`
+    });
+  }
+});
+
+// 获取多维表格列表（分页查询，需要验证）
+app.get(`${BASE_PATH}/api/bitables`, requireAuth, async (req, res) => {
+  try {
+    const pageToken = req.query.page_token || null;
+    const pageSize = parseInt(req.query.page_size) || 20;
+    
+    if (!process.env.MM_TABLE_ID) {
+      return res.status(500).json({
+        success: false,
+        message: '多维表格元信息表未配置，请在环境变量中设置MM_TABLE_ID'
+      });
+    }
+    
+    const token = await getTenantAccessToken();
+    const mmAppToken = process.env.MM_APP_TOKEN || process.env.APP_TOKEN;
+    
+    const params = {
+      page_size: Math.min(pageSize, 100) // 最多100条
+    };
+    if (pageToken) {
+      params.page_token = pageToken;
+    }
+    
+    const response = await axios.get(
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${mmAppToken}/tables/${process.env.MM_TABLE_ID}/records`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json; charset=utf-8'
+        },
+        params: params
+      }
+    );
+    
+    if (response.data.code === 0) {
+      const items = response.data.data.items || [];
+      const processedItems = items.map(item => {
+        const fields = item.fields;
+        return {
+          record_id: item.record_id,
+          table_name: fields['name'] || fields['表格名称'] || '',
+          app_token: fields['token'] || fields['应用Token'] || '',
+          table_id: fields['tableId'] || fields['表格ID'] || '',
+          sort: fields['sort'] || fields['排序'] || 10,
+          description: fields['desc'] || fields['描述'] || '',
+          created_time: item.created_time,
+          last_modified_time: item.last_modified_time
+        };
+      });
+      
+      res.json({
+        success: true,
+        data: {
+          items: processedItems,
+          has_more: response.data.data.has_more || false,
+          page_token: response.data.data.page_token || null,
+          total: processedItems.length
+        }
+      });
+    } else {
+      console.error('获取多维表格列表失败:', response.data);
+      res.status(500).json({
+        success: false,
+        message: `获取多维表格列表失败: ${response.data.msg || '未知错误'}`
+      });
+    }
+  } catch (error) {
+    console.error('获取多维表格列表异常:', error.message);
+    res.status(500).json({
+      success: false,
+      message: `获取多维表格列表失败: ${error.message}`
+    });
+  }
+});
+
+// 创建新的多维表格（需要验证）
+app.post(`${BASE_PATH}/api/bitables`, requireAuth, async (req, res) => {
+  try {
+    const { table_name, description } = req.body;
+    
+    if (!table_name || !table_name.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: '表格名称不能为空'
+      });
+    }
+    
+    if (table_name.length > 100) {
+      return res.status(400).json({
+        success: false,
+        message: '表格名称长度不能超过100个字符'
+      });
+    }
+    
+    const token = await getTenantAccessToken();
+    
+    // 检查folder_token配置
+    if (!process.env.FOLDER_TOKEN) {
+      return res.status(500).json({
+        success: false,
+        message: '文件夹Token未配置，请在环境变量中设置FOLDER_TOKEN'
+      });
+    }
+    
+    // 1. 调用飞书API创建多维表格应用
+    // 使用创建应用的接口：POST https://open.feishu.cn/open-apis/bitable/v1/apps
+    console.log('开始创建多维表格应用，表格名称:', table_name);
+    console.log('使用Folder Token:', process.env.FOLDER_TOKEN);
+    
+    let createAppResponse;
+    try {
+      createAppResponse = await axios.post(
+        'https://open.feishu.cn/open-apis/bitable/v1/apps',
+        {
+          folder_token: process.env.FOLDER_TOKEN,
+          name: table_name
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json; charset=utf-8'
+          }
+        }
+      );
+      
+      console.log('创建应用API响应:', JSON.stringify(createAppResponse.data, null, 2));
+    } catch (apiError) {
+      console.error('创建多维表格应用API调用异常:', apiError.response?.data || apiError.message);
+      return res.status(500).json({
+        success: false,
+        message: `创建多维表格应用API调用失败: ${apiError.response?.data?.msg || apiError.message || '未知错误'}`
+      });
+    }
+    
+    if (createAppResponse.data.code !== 0) {
+      console.error('创建多维表格应用失败，错误码:', createAppResponse.data.code);
+      console.error('错误信息:', createAppResponse.data.msg);
+      console.error('完整响应:', JSON.stringify(createAppResponse.data, null, 2));
+      return res.status(500).json({
+        success: false,
+        message: `创建多维表格应用失败: ${createAppResponse.data.msg || '未知错误'} (错误码: ${createAppResponse.data.code})`
+      });
+    }
+    
+    // 检查返回数据结构
+    if (!createAppResponse.data.data || !createAppResponse.data.data.app) {
+      console.error('创建应用返回数据结构异常:', JSON.stringify(createAppResponse.data, null, 2));
+      return res.status(500).json({
+        success: false,
+        message: '创建应用成功，但返回数据结构异常'
+      });
+    }
+    
+    const newApp = createAppResponse.data.data.app;
+    const newAppToken = newApp.app_token;
+    const newAppId = newApp.app_id;
+    
+    console.log('成功创建多维表格应用，App Token:', newAppToken);
+    console.log('App ID:', newAppId);
+    
+    // 2. 为新创建的多维表格添加协作者权限
+    if (process.env.OPEN_ID) {
+      try {
+        console.log('开始添加协作者权限，Open ID:', process.env.OPEN_ID);
+        const permissionResponse = await axios.post(
+          `https://open.feishu.cn/open-apis/drive/v1/permissions/${newAppToken}/members?need_notification=false&type=bitable`,
+          {
+            member_id: process.env.OPEN_ID,
+            member_type: 'openid',
+            perm: 'edit',
+            perm_type: 'container',
+            type: 'user'
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json; charset=utf-8'
+            }
+          }
+        );
+        
+        if (permissionResponse.data.code === 0) {
+          console.log('成功添加协作者权限');
+        } else {
+          console.warn('添加协作者权限失败:', permissionResponse.data.msg);
+          // 不中断流程，继续执行
+        }
+      } catch (permissionError) {
+        console.warn('添加协作者权限异常:', permissionError.response?.data || permissionError.message);
+        // 不中断流程，继续执行
+      }
+    } else {
+      console.warn('OPEN_ID未配置，跳过添加协作者权限');
+    }
+    
+    // 3. 获取新创建应用的默认表格ID（新创建的应用会自动创建一个默认表格）
+    // 需要先获取应用下的表格列表
+    let defaultTableId = null;
+    try {
+      const tablesResponse = await axios.get(
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${newAppToken}/tables`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json; charset=utf-8'
+          }
+        }
+      );
+      
+      if (tablesResponse.data.code === 0 && tablesResponse.data.data && tablesResponse.data.data.items) {
+        const tables = tablesResponse.data.data.items;
+        if (tables.length > 0) {
+          defaultTableId = tables[0].table_id;
+          console.log('获取到默认表格ID:', defaultTableId);
+        }
+      }
+    } catch (tableError) {
+      console.warn('获取表格列表失败:', tableError.response?.data || tableError.message);
+    }
+    
+    // 4. 为新建的表格添加字段（分类、排序、站点名称、网址）
+    if (defaultTableId) {
+      console.log('开始为表格添加字段，表格ID:', defaultTableId);
+      const fields = [
+        {
+          field_name: '分类',
+          type: 3, // 单选类型
+          property: {
+            options: []
+          }
+        },
+        {
+          field_name: '排序',
+          type: 2 // 数字类型
+        },
+        {
+          field_name: '站点名称',
+          type: 1 // 单行文本类型
+        },
+        {
+          field_name: '网址',
+          type: 15 // 超链接类型
+        }
+      ];
+      
+      for (const field of fields) {
+        try {
+          const fieldResponse = await axios.post(
+            `https://open.feishu.cn/open-apis/bitable/v1/apps/${newAppToken}/tables/${defaultTableId}/fields`,
+            field,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json; charset=utf-8'
+              }
+            }
+          );
+          if (fieldResponse.data.code === 0) {
+            console.log(`成功创建字段: ${field.field_name}`);
+          } else {
+            console.warn(`创建字段 ${field.field_name} 失败:`, fieldResponse.data.msg);
+          }
+        } catch (fieldError) {
+          console.warn(`创建字段 ${field.field_name} 异常:`, fieldError.response?.data || fieldError.message);
+          // 继续创建其他字段，不中断流程
+        }
+      }
+      console.log('字段创建完成');
+    }
+    
+    // 5. 将表格元信息保存到MM_TABLE_ID中
+    // MM_TABLE_ID表格字段：name、token、tableId、sort、desc
+    if (!process.env.MM_TABLE_ID) {
+      console.warn('多维表格元信息表未配置，无法保存表格信息');
+      // 即使保存元信息失败，也返回成功，因为应用已经创建
+      return res.json({
+        success: true,
+        message: '多维表格应用创建成功，但元信息表未配置',
+        data: {
+          app_token: newAppToken,
+          app_id: newAppId,
+          table_id: defaultTableId,
+          name: table_name,
+          description: description || ''
+        }
+      });
+    }
+    
+    const mmAppToken = process.env.MM_APP_TOKEN || process.env.APP_TOKEN;
+    
+    // 获取当前最大排序值，新表格的排序值应该是最大值+10
+    let maxSort = 10;
+    try {
+      const mmListResponse = await axios.get(
+        `https://open.feishu.cn/open-apis/bitable/v1/apps/${mmAppToken}/tables/${process.env.MM_TABLE_ID}/records`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json; charset=utf-8'
+          },
+          params: {
+            page_size: 100
+          }
+        }
+      );
+      
+      if (mmListResponse.data.code === 0 && mmListResponse.data.data && mmListResponse.data.data.items) {
+        const items = mmListResponse.data.data.items;
+        items.forEach(item => {
+          const sort = item.fields['排序'] || item.fields.sort || 10;
+          if (sort > maxSort) {
+            maxSort = Number(sort);
+          }
+        });
+      }
+    } catch (sortError) {
+      console.warn('获取排序值失败，使用默认值:', sortError.message);
+    }
+    
+    const newSort = maxSort + 1;
+    
+    // 保存到MM_TABLE_ID表格，字段名：name、token、tableId、sort、desc
+    const mmFields = {
+      'name': table_name,
+      'token': newAppToken,
+      'tableId': defaultTableId || '',
+      'sort': newSort,
+      'desc': description || ''
+    };
+    
+    console.log('保存表格元信息到MM_TABLE_ID，字段:', mmFields);
+    
+    const saveMetaResponse = await axios.post(
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${mmAppToken}/tables/${process.env.MM_TABLE_ID}/records`,
+      { fields: mmFields },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json; charset=utf-8'
+        }
+      }
+    );
+    
+    if (saveMetaResponse.data.code !== 0) {
+      console.error('保存表格元信息失败:', saveMetaResponse.data);
+      console.warn('应用已创建，但元信息保存失败');
+    } else {
+      console.log('成功保存表格元信息');
+    }
+    
+    res.json({
+      success: true,
+      message: '多维表格应用创建成功',
+      data: {
+        app_token: newAppToken,
+        app_id: newAppId,
+        table_id: defaultTableId,
+        name: table_name,
+        description: description || ''
+      }
+    });
+  } catch (error) {
+    console.error('创建多维表格异常:', error.message);
+    res.status(500).json({
+      success: false,
+      message: `创建多维表格失败: ${error.message}`
+    });
+  }
+});
+
+// 批量创建记录到多维表格
+async function batchCreateBitableRecords(token, records, appToken = null, tableId = null) {
+  try {
+    const targetAppToken = appToken || process.env.APP_TOKEN;
+    const targetTableId = tableId || process.env.TABLE_ID || 'tbl3I3RtxgtiC7eF';
+    
+    const response = await axios.post(
+      `https://open.feishu.cn/open-apis/bitable/v1/apps/${targetAppToken}/tables/${targetTableId}/records/batch_create`,
+      { records },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json; charset=utf-8'
+        }
+      }
+    );
+
+    if (response.data.code === 0) {
+      return response.data.data;
+    } else {
+      console.error('批量创建记录失败:', response.data);
+      throw new Error(`批量创建记录失败: ${response.data.msg}`);
+    }
+  } catch (error) {
+    console.error('批量创建记录异常:', error.message);
+    throw error;
+  }
+}
+
+// 批量导入导航数据API（需要验证）
+app.post(`${BASE_PATH}/api/links/batch-import`, requireAuth, async (req, res) => {
+  try {
+    const { data, table_id } = req.body;
+    
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '数据不能为空，且必须是数组格式'
+      });
+    }
+    
+    // 验证数据格式
+    for (const item of data) {
+      if (!item.name || !item.name.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: '网站名称不能为空'
+        });
+      }
+      
+      if (!item.url || !item.url.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: '网站网址不能为空'
+        });
+      }
+      
+      if (!item.category || !item.category.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: '分类不能为空'
+        });
+      }
+      
+      // 验证网址格式
+      try {
+        new URL(item.url);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          message: `无效的网址格式: ${item.url}，请确保包含http://或https://`
+        });
+      }
+    }
+    
+    const token = await getTenantAccessToken();
+    
+    // 获取目标表格ID和App Token
+    let targetTableId = table_id || 'tbl3I3RtxgtiC7eF';
+    let targetAppToken = process.env.APP_TOKEN;
+    
+    // 如果指定了table_id，需要从MM_TABLE_ID中查找对应的app_token
+    if (table_id && table_id !== 'tbl3I3RtxgtiC7eF') {
+      if (process.env.MM_TABLE_ID) {
+        try {
+          const mmAppToken = process.env.MM_APP_TOKEN || process.env.APP_TOKEN;
+          const mmResponse = await axios.get(
+            `https://open.feishu.cn/open-apis/bitable/v1/apps/${mmAppToken}/tables/${process.env.MM_TABLE_ID}/records`,
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json; charset=utf-8'
+              },
+              params: {
+                page_size: 100
+              }
+            }
+          );
+          
+          if (mmResponse.data.code === 0 && mmResponse.data.data.items) {
+            const targetTable = mmResponse.data.data.items.find(item => {
+              const fields = item.fields;
+              return (fields['tableId'] || fields['表格ID']) === table_id;
+            });
+            
+            if (targetTable) {
+              const tableFields = targetTable.fields;
+              targetAppToken = tableFields['token'] || tableFields['应用Token'] || process.env.APP_TOKEN;
+              targetTableId = tableFields['tableId'] || tableFields['表格ID'] || table_id;
+            }
+          }
+        } catch (mmError) {
+          console.warn('查找表格信息失败，使用默认表格:', mmError.message);
+          targetTableId = 'tbl3I3RtxgtiC7eF';
+        }
+      }
+    }
+    
+    // 转换为飞书API格式
+    const records = data.map((item, index) => ({
+      fields: {
+        '分类': item.category,
+        '排序': item.sort || (index + 1) * 10,
+        '站点名称': item.name,
+        '网址': {
+          'link': item.url,
+          'text': item.name
+        }
+      }
+    }));
+    
+    // 批量创建（每次最多500条，飞书API限制）
+    const batchSize = 500;
+    let totalImported = 0;
+    let totalFailed = 0;
+    const errors = [];
+    
+    for (let i = 0; i < records.length; i += batchSize) {
+      const batch = records.slice(i, i + batchSize);
+      
+      try {
+        const result = await batchCreateBitableRecords(token, batch, targetAppToken, targetTableId);
+        const createdCount = result.records?.length || 0;
+        totalImported += createdCount;
+        console.log(`批量导入成功: ${createdCount} 条记录`);
+      } catch (error) {
+        console.error(`批量导入失败 (批次 ${Math.floor(i / batchSize) + 1}):`, error.message);
+        totalFailed += batch.length;
+        errors.push({
+          batch: Math.floor(i / batchSize) + 1,
+          error: error.message
+        });
+      }
+      
+      // 避免请求过快，添加延迟
+      if (i + batchSize < records.length) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+    
+    res.json({
+      success: totalFailed === 0,
+      message: `导入完成: 成功 ${totalImported} 条，失败 ${totalFailed} 条`,
+      data: {
+        imported: totalImported,
+        failed: totalFailed,
+        total: data.length,
+        errors: errors.length > 0 ? errors : undefined
+      }
+    });
+  } catch (error) {
+    console.error('批量导入异常:', error.message);
+    res.status(500).json({
+      success: false,
+      message: `批量导入失败: ${error.message}`
     });
   }
 });

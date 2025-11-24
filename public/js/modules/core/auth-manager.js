@@ -344,30 +344,23 @@ class AuthManager {
     // 更新桌面端按钮
     if (loginBtnDesktop) {
       const icon = loginBtnDesktop.querySelector('i');
-      let statusText = loginBtnDesktop.querySelector('#login-status-text');
       
       if (this.authenticated) {
         if (icon) {
           icon.className = 'bi bi-unlock';
         }
-        if (!statusText) {
-          statusText = document.createElement('span');
-          statusText.id = 'login-status-text';
-          loginBtnDesktop.appendChild(statusText);
+        if (loginStatusText) {
+          loginStatusText.textContent = '已登录';
         }
-        statusText.textContent = '已登录';
         loginBtnDesktop.title = '登出';
         loginBtnDesktop.classList.add('authenticated');
       } else {
         if (icon) {
           icon.className = 'bi bi-lock';
         }
-        if (!statusText) {
-          statusText = document.createElement('span');
-          statusText.id = 'login-status-text';
-          loginBtnDesktop.appendChild(statusText);
+        if (loginStatusText) {
+          loginStatusText.textContent = '登录';
         }
-        statusText.textContent = '登录';
         loginBtnDesktop.title = '登录';
         loginBtnDesktop.classList.remove('authenticated');
       }
@@ -375,6 +368,11 @@ class AuthManager {
 
     // 更新合并后的审核/申请按钮
     this.updateReviewButton();
+    
+    // 更新多维表格管理按钮可见性
+    if (window.bitableManager && typeof window.bitableManager.updateButtonVisibility === 'function') {
+      window.bitableManager.updateButtonVisibility();
+    }
   }
 
   // 显示游客申请查看弹窗

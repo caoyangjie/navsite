@@ -7,44 +7,73 @@ class DataManager {
     this.categories = [];
     this.CACHE_DURATION = 60 * 60 * 1000; // 缓存1小时
     this.CACHE_KEY = 'navsite_navigation_cache'; // LocalStorage键名
+    this.currentTableId = null; // 当前选中的表格ID
   }
 
   // 从LocalStorage读取缓存数据
   readCacheFromStorage() {
     try {
-      const cachedData = localStorage.getItem(this.CACHE_KEY);
+      const cacheKey = this.getCacheKey();
+      const cachedData = localStorage.getItem(cacheKey);
       if (!cachedData) return null;
       
       const parsedData = JSON.parse(cachedData);
       
       // 检查缓存是否过期
       if (Date.now() - parsedData.timestamp > this.CACHE_DURATION) {
-        localStorage.removeItem(this.CACHE_KEY); // 删除过期缓存
+        localStorage.removeItem(cacheKey); // 删除过期缓存
         return null;
+      }
+      
+      // 检查缓存的表格ID是否匹配
+      if (parsedData.tableId !== this.currentTableId) {
+        return null; // 表格ID不匹配，不使用缓存
       }
       
       return parsedData;
     } catch (error) {
       console.warn('读取缓存数据失败:', error);
-      localStorage.removeItem(this.CACHE_KEY); // 删除损坏的缓存
+      const cacheKey = this.getCacheKey();
+      localStorage.removeItem(cacheKey); // 删除损坏的缓存
       return null;
     }
+  }
+
+  // 获取缓存键名（根据表格ID）
+  getCacheKey() {
+    const tableSuffix = this.currentTableId ? `_${this.currentTableId}` : '';
+    return `${this.CACHE_KEY}${tableSuffix}`;
   }
 
   // 将缓存数据写入LocalStorage
   writeCacheToStorage(data, categories, dateInfo) {
     try {
+      const cacheKey = this.getCacheKey();
       const cacheData = {
         data: data,
         categories: categories,
         dateInfo: dateInfo,
+        tableId: this.currentTableId,
         timestamp: Date.now()
       };
-      localStorage.setItem(this.CACHE_KEY, JSON.stringify(cacheData));
+      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
     } catch (error) {
       console.warn('写入缓存数据失败:', error);
       // 静默处理写入失败，不影响主要功能
     }
+  }
+
+  // 切换表格数据源
+  setTableId(tableId) {
+    this.currentTableId = tableId;
+    // 清除当前缓存，强制重新加载
+    const cacheKey = this.getCacheKey();
+    localStorage.removeItem(cacheKey);
+  }
+
+  // 获取当前表格ID
+  getCurrentTableId() {
+    return this.currentTableId;
   }
 
   // 获取导航数据
@@ -70,7 +99,11 @@ class DataManager {
     try {
       // 使用基础路径
       const basePath = window.BASE_PATH || '';
-      const apiUrl = `${basePath}/api/navigation`;
+      let apiUrl = `${basePath}/api/navigation`;
+      // 如果指定了表格ID，添加到查询参数
+      if (this.currentTableId) {
+        apiUrl += `?table_id=${encodeURIComponent(this.currentTableId)}`;
+      }
       const response = await fetch(apiUrl);
       
       // 检查响应状态
@@ -306,6 +339,10 @@ class DataManager {
   isCacheValid() {
     const cachedData = this.readCacheFromStorage();
     return cachedData !== null;
+  }
+
+  hasData() {
+    return this.navigationData && Object.keys(this.navigationData).length > 0;
   }
 }
 

@@ -9,6 +9,7 @@ class UIRenderer {
     
     // DOM元素引用
     this.categoryMenu = document.getElementById('category-menu');
+    this.categoryTabs = document.getElementById('category-tabs');
     this.toolsGrid = document.getElementById('tools-grid');
     this.currentTimeEl = document.getElementById('current-time');
     this.dateInfoEl = document.getElementById('date-info');
@@ -46,9 +47,19 @@ class UIRenderer {
       li.addEventListener('click', () => this.showTools(category));
       this.categoryMenu.appendChild(li);
     });
+
+    // 生成分类标签页
+    this.generateCategoryTabs();
   }
 
-  // 显示工具
+  // 生成分类标签页（已禁用，不再显示类别按钮）
+  generateCategoryTabs() {
+    if (!this.categoryTabs) return;
+    // 隐藏类别标签页
+    this.categoryTabs.style.display = 'none';
+  }
+
+  // 显示工具（按类别分组显示）
   showTools(category) {
     // 更新当前分类
     this.currentCategory = category;
@@ -71,17 +82,273 @@ class UIRenderer {
 
     const { navigationData, categories } = this.dataManager.getCurrentData();
 
-    // 显示所有分类或特定分类的工具
+    // 按类别分组显示
     if (category === 'all') {
-      // 显示所有分类的工具
+      // 显示所有分类，按类别分组
       categories.forEach(cat => {
         const tools = navigationData[cat] || [];
-        tools.forEach(tool => this.addToolItem(tool));
+        if (tools.length > 0) {
+          // 创建类别标题
+          const categorySection = document.createElement('div');
+          categorySection.className = 'category-section';
+          
+          const categoryTitle = document.createElement('div');
+          categoryTitle.className = 'category-title';
+          
+          // 根据分类名称选择合适的图标
+          let iconClass = 'bi-folder';
+          if (cat.includes('Code') || cat.includes('代码')) {
+            iconClass = 'bi-code-square';
+          } else if (cat.includes('设计')) {
+            iconClass = 'bi-palette';
+          } else if (cat.includes('产品')) {
+            iconClass = 'bi-diagram-3';
+          }
+          
+          categoryTitle.innerHTML = `<i class="bi ${iconClass}"></i><span>${cat}</span>`;
+          categorySection.appendChild(categoryTitle);
+          
+          // 创建该类别的工具网格
+          const categoryGrid = document.createElement('div');
+          categoryGrid.className = 'category-grid';
+          
+          tools.forEach(tool => {
+            const toolItem = this.createToolItem(tool, cat);
+            categoryGrid.appendChild(toolItem);
+          });
+          
+          categorySection.appendChild(categoryGrid);
+          this.toolsGrid.appendChild(categorySection);
+        }
       });
     } else {
-      // 显示特定分类的工具
+      // 显示特定分类
       const tools = navigationData[category] || [];
-      tools.forEach(tool => this.addToolItem(tool));
+      if (tools.length > 0) {
+        // 创建类别标题
+        const categorySection = document.createElement('div');
+        categorySection.className = 'category-section';
+        
+        const categoryTitle = document.createElement('div');
+        categoryTitle.className = 'category-title';
+        
+        let iconClass = 'bi-folder';
+        if (category.includes('Code') || category.includes('代码')) {
+          iconClass = 'bi-code-square';
+        } else if (category.includes('设计')) {
+          iconClass = 'bi-palette';
+        } else if (category.includes('产品')) {
+          iconClass = 'bi-diagram-3';
+        }
+        
+        categoryTitle.innerHTML = `<i class="bi ${iconClass}"></i><span>${category}</span>`;
+        categorySection.appendChild(categoryTitle);
+        
+        // 创建该类别的工具网格
+        const categoryGrid = document.createElement('div');
+        categoryGrid.className = 'category-grid';
+        
+        tools.forEach(tool => {
+          const toolItem = this.createToolItem(tool, category);
+          categoryGrid.appendChild(toolItem);
+        });
+        
+        categorySection.appendChild(categoryGrid);
+        this.toolsGrid.appendChild(categorySection);
+      }
+    }
+  }
+
+  // 创建工具项元素（从addToolItem中提取）
+  createToolItem(tool, categoryContext = '') {
+    const toolItem = document.createElement('div');
+    toolItem.className = 'tool-item glass-container hover-lift click-bounce';
+    toolItem.dataset.id = tool.id || '';
+    const resolvedCategory = tool.category || categoryContext || '';
+
+    // 创建链接元素 - 跳转到详情页
+    const linkElement = document.createElement('a');
+    // 解析URL，兼容对象格式 { link: string } 或 { text: string }
+    let urlString = '';
+    if (tool && tool.url) {
+      if (typeof tool.url === 'string') {
+        urlString = tool.url;
+      } else if (typeof tool.url === 'object') {
+        if (tool.url.link && typeof tool.url.link === 'string') {
+          urlString = tool.url.link;
+        } else if (tool.url.text && typeof tool.url.text === 'string') {
+          urlString = tool.url.text;
+        }
+      }
+    }
+    
+    // 构建详情页URL
+    const basePath = window.BASE_PATH || '';
+    const tableParam = tool.tableId ? `&table_id=${encodeURIComponent(tool.tableId)}` : '';
+    const detailUrl = `${basePath}/detail.html?id=${encodeURIComponent(tool.id || '')}&name=${encodeURIComponent(tool.name || '')}&url=${encodeURIComponent(urlString)}${tool.description ? '&description=' + encodeURIComponent(tool.description) : ''}${tool.category ? '&category=' + encodeURIComponent(tool.category) : ''}${tableParam}`;
+    
+    linkElement.href = detailUrl;
+    linkElement.target = '_self'; // 在当前窗口打开详情页
+    if (tool && tool.name) {
+      linkElement.title = tool.name;
+    }
+
+    // 使用图标（如果有）或尝试获取网站favicon或生成文字图标
+    let iconHtml = '';
+    let useFavicon = false;
+
+    if (tool.icon && typeof tool.icon === 'string' && tool.icon.trim()) {
+      // 如果是URL，使用img标签      
+      if (tool.icon.startsWith('http')) {
+        iconHtml = `<img src="${tool.icon}" alt="${tool.name}" class="tool-icon">`;
+      } else {
+        // 否则假设是Bootstrap图标类名
+        iconHtml = `<i class="bi ${tool.icon} tool-icon"></i>`;
+      }
+    } else {
+      // 尝试使用网站的favicon
+      const faviconUrl = this.getFaviconUrl(tool.url);      
+      if (faviconUrl) {
+        // 添加onerror处理，当图标加载失败时显示文字图标
+        iconHtml = `<img src="${faviconUrl}" alt="${tool.name}" class="tool-icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">`;
+        useFavicon = true;
+      }
+
+      // 添加文字图标作为备用或默认选项
+      // 如果工具名称为空则跳过生成图标
+      if (tool.name) {
+        const textIconHtml = this.generateTextIcon(tool.name);
+        iconHtml += textIconHtml;
+      }
+
+      if (useFavicon) {
+        // 如果使用favicon，初始隐藏文字图标
+        iconHtml = iconHtml.replace('<div class="text-icon"', '<div class="text-icon" style="display: none;"');
+      }
+    }
+
+    // 构建工具卡片内容 - 横向布局：左侧图标、中间内容、右侧箭头
+    const toolContentWrapper = document.createElement('div');
+    toolContentWrapper.className = 'tool-content-wrapper';
+    
+    // 左侧图标容器
+    const iconContainer = document.createElement('div');
+    iconContainer.className = 'tool-icon-container';
+    iconContainer.innerHTML = iconHtml;
+    
+    // 中间内容容器
+    const contentContainer = document.createElement('div');
+    contentContainer.className = 'tool-content';
+    
+    const nameElement = document.createElement('div');
+    nameElement.className = 'tool-name';
+    nameElement.textContent = tool.name || '';
+    
+    contentContainer.appendChild(nameElement);
+    
+    // 如果有描述信息，添加描述
+    if (tool.description && tool.description.trim()) {
+      const descElement = document.createElement('div');
+      descElement.className = 'tool-description';
+      descElement.textContent = tool.description;
+      contentContainer.appendChild(descElement);
+    }
+    
+    // 右侧箭头图标
+    const arrowIcon = document.createElement('div');
+    arrowIcon.className = 'tool-arrow';
+    arrowIcon.innerHTML = '<i class="bi bi-chevron-right"></i>';
+    
+    // 组装内容
+    toolContentWrapper.appendChild(iconContainer);
+    toolContentWrapper.appendChild(contentContainer);
+    toolContentWrapper.appendChild(arrowIcon);
+    
+    linkElement.appendChild(toolContentWrapper);
+
+    // 缓存当前点击的导航数据，提升详情页加载速度
+    linkElement.addEventListener('click', () => {
+      this.cacheSelectedTool({
+        ...tool,
+        category: resolvedCategory,
+        tableId: tool.tableId || (this.dataManager && this.dataManager.getCurrentTableId ? this.dataManager.getCurrentTableId() : '')
+      });
+    }, { once: false });
+
+    // 检查是否为管理员（仅在管理员登录时显示编辑和删除按钮）
+    const isAdmin = window.authManager && window.authManager.authenticated;
+
+    // 添加操作按钮容器（仅在管理员登录时显示）
+    if (isAdmin) {
+      const actionsContainer = document.createElement('div');
+      actionsContainer.className = 'tool-item-actions';
+
+      // 添加编辑按钮
+      const editBtn = document.createElement('button');
+      editBtn.className = 'tool-item-edit-btn';
+      editBtn.innerHTML = '<i class="bi bi-pencil"></i>';
+      editBtn.title = '编辑网站';
+      editBtn.dataset.toolId = tool.id || '';
+      editBtn.dataset.toolName = tool.name || '';
+      editBtn.dataset.toolUrl = urlString || '';
+      editBtn.dataset.toolCategory = tool.category || '';
+      editBtn.dataset.toolSort = tool.sort || '200';
+
+      // 添加编辑点击事件
+      editBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.linkManager) {
+          window.linkManager.showEditModal(
+            tool.id || '',
+            tool.name || '',
+            urlString || '',
+            tool.category || '',
+            tool.sort || 200
+          );
+        }
+      });
+
+      // 添加删除按钮
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'tool-item-delete-btn';
+      deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
+      deleteBtn.title = '删除网站';
+      deleteBtn.dataset.toolId = tool.id || '';
+      deleteBtn.dataset.toolName = tool.name || '';
+
+      // 添加删除点击事件
+      deleteBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.linkManager) {
+          window.linkManager.showDeleteConfirmation(tool.id || '', tool.name || '');
+        }
+      });
+
+      actionsContainer.appendChild(editBtn);
+      actionsContainer.appendChild(deleteBtn);
+      toolItem.appendChild(actionsContainer);
+    }
+
+    // 组装工具项
+    toolItem.appendChild(linkElement);
+
+    return toolItem;
+  }
+
+  cacheSelectedTool(toolData) {
+    if (typeof sessionStorage === 'undefined') {
+      return;
+    }
+    try {
+      const payload = {
+        tool: toolData,
+        timestamp: Date.now()
+      };
+      sessionStorage.setItem('navsite_selected_tool', JSON.stringify(payload));
+    } catch (error) {
+      console.warn('缓存选中导航数据失败:', error);
     }
   }
 
@@ -190,132 +457,9 @@ class UIRenderer {
     return `<div class="text-icon" style="background-color: ${bgColor}; color: ${textColor};">${iconText}</div>`;
   }
 
-  // 添加工具项
+  // 添加工具项（保留用于向后兼容，现在使用createToolItem）
   addToolItem(tool) {
-    const toolItem = document.createElement('div');
-    toolItem.className = 'tool-item glass-container hover-lift click-bounce';
-    toolItem.dataset.id = tool.id || '';
-
-    // 创建链接元素
-    const linkElement = document.createElement('a');
-    // 解析URL，兼容对象格式 { link: string } 或 { text: string }
-    let urlString = '';
-    if (tool && tool.url) {
-      if (typeof tool.url === 'string') {
-        urlString = tool.url;
-      } else if (typeof tool.url === 'object') {
-        if (tool.url.link && typeof tool.url.link === 'string') {
-          urlString = tool.url.link;
-        } else if (tool.url.text && typeof tool.url.text === 'string') {
-          urlString = tool.url.text;
-        }
-      }
-    }
-    linkElement.href = urlString || '#';
-    linkElement.target = '_blank';
-    linkElement.rel = 'noopener noreferrer';
-    if (tool && tool.name) {
-      linkElement.title = tool.name;
-    }
-
-    // 使用图标（如果有）或尝试获取网站favicon或生成文字图标
-    let iconHtml = '';
-    let useFavicon = false;
-
-    if (tool.icon && typeof tool.icon === 'string' && tool.icon.trim()) {
-      // 如果是URL，使用img标签      
-      if (tool.icon.startsWith('http')) {
-        iconHtml = `<img src="${tool.icon}" alt="${tool.name}" class="tool-icon">`;
-      } else {
-        // 否则假设是Bootstrap图标类名
-        iconHtml = `<i class="bi ${tool.icon} tool-icon"></i>`;
-      }
-    } else {
-      // 尝试使用网站的favicon
-      const faviconUrl = this.getFaviconUrl(tool.url);      
-      if (faviconUrl) {
-        // 添加onerror处理，当图标加载失败时显示文字图标
-        iconHtml = `<img src="${faviconUrl}" alt="${tool.name}" class="tool-icon" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">`;
-        useFavicon = true;
-      }
-
-      // 添加文字图标作为备用或默认选项
-      // 如果工具名称为空则跳过生成图标
-      if (tool.name) {
-        const textIconHtml = this.generateTextIcon(tool.name);
-        iconHtml += textIconHtml;
-      }
-
-      if (useFavicon) {
-        // 如果使用favicon，初始隐藏文字图标
-        iconHtml = iconHtml.replace('<div class="text-icon"', '<div class="text-icon" style="display: none;"');
-      }
-    }
-
-    linkElement.innerHTML = `
-      ${iconHtml}
-      <div class="tool-name">${tool.name}</div>
-    `;
-
-    // 检查是否为管理员（仅在管理员登录时显示编辑和删除按钮）
-    const isAdmin = window.authManager && window.authManager.authenticated;
-
-    // 添加操作按钮容器（仅在管理员登录时显示）
-    if (isAdmin) {
-      const actionsContainer = document.createElement('div');
-      actionsContainer.className = 'tool-item-actions';
-
-      // 添加编辑按钮
-      const editBtn = document.createElement('button');
-      editBtn.className = 'tool-item-edit-btn';
-      editBtn.innerHTML = '<i class="bi bi-pencil"></i>';
-      editBtn.title = '编辑网站';
-      editBtn.dataset.toolId = tool.id || '';
-      editBtn.dataset.toolName = tool.name || '';
-      editBtn.dataset.toolUrl = urlString || '';
-      editBtn.dataset.toolCategory = tool.category || '';
-      editBtn.dataset.toolSort = tool.sort || '200';
-
-      // 添加编辑点击事件
-      editBtn.addEventListener('click', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (window.linkManager) {
-          window.linkManager.showEditModal(
-            tool.id || '',
-            tool.name || '',
-            urlString || '',
-            tool.category || '',
-            tool.sort || 200
-          );
-        }
-      });
-
-      // 添加删除按钮
-      const deleteBtn = document.createElement('button');
-      deleteBtn.className = 'tool-item-delete-btn';
-      deleteBtn.innerHTML = '<i class="bi bi-trash"></i>';
-      deleteBtn.title = '删除网站';
-      deleteBtn.dataset.toolId = tool.id || '';
-      deleteBtn.dataset.toolName = tool.name || '';
-
-      // 添加删除点击事件
-      deleteBtn.addEventListener('click', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (window.linkManager) {
-          window.linkManager.showDeleteConfirmation(tool.id || '', tool.name || '');
-        }
-      });
-
-      actionsContainer.appendChild(editBtn);
-      actionsContainer.appendChild(deleteBtn);
-      toolItem.appendChild(actionsContainer);
-    }
-
-    // 组装工具项
-    toolItem.appendChild(linkElement);
-
+    const toolItem = this.createToolItem(tool);
     this.toolsGrid.appendChild(toolItem);
   }
 

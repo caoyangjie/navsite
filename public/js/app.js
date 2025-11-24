@@ -23,6 +23,8 @@ function loadModules() {
     `${basePath}/js/modules/features/link-manager.js`,
     `${basePath}/js/modules/features/interaction-manager.js`,
     `${basePath}/js/modules/features/admin-review-manager.js`,
+    `${basePath}/js/modules/features/bitable-manager.js`,
+    `${basePath}/js/modules/features/nav-dropdown-manager.js`,
     
     // 工具模块
     `${basePath}/js/modules/utils/common-utils.js`
@@ -124,11 +126,8 @@ async function initCoreModules() {
   uiRenderer = new window.UIRenderer(dataManager);
   window.uiRenderer = uiRenderer; // 设置全局引用
   
-  // 立即更新时间信息
-  uiRenderer.updateTimeInfoImmediately();
-  
-  // 开始定时更新时间
-  setInterval(() => uiRenderer.updateTimeInfo(), 1000);
+  // 初始化搜索功能
+  initSearchFeature();
 }
 
 // 初始化功能模块
@@ -136,6 +135,18 @@ async function initFeatureModules() {
   // 初始化链接管理器
   linkManager = new window.LinkManager(dataManager);
   window.linkManager = linkManager; // 设置全局引用
+  
+  // 初始化多维表格管理器
+  if (window.BitableManager) {
+    const bitableManager = new window.BitableManager();
+    window.bitableManager = bitableManager; // 设置全局引用
+  }
+  
+  // 初始化导航下拉菜单管理器
+  if (window.NavDropdownManager) {
+    const navDropdownManager = new window.NavDropdownManager();
+    window.navDropdownManager = navDropdownManager; // 设置全局引用
+  }
 }
 
 // 加载并显示数据
@@ -155,11 +166,6 @@ async function loadAndDisplayData() {
       
       // 显示所有工具
       uiRenderer.showTools('all');
-      
-      // 更新日期信息
-      if (result.dateInfo) {
-        uiRenderer.updateDateInfo(result.dateInfo);
-      }
     } else {
       uiRenderer.hideLoadingAnimation();
       uiRenderer.showError('加载数据失败，请稍后重试');
@@ -169,6 +175,118 @@ async function loadAndDisplayData() {
     uiRenderer.hideLoadingAnimation();
     uiRenderer.showError('网络错误，请检查网络连接');
   }
+}
+
+// 初始化搜索功能
+function initSearchFeature() {
+  const searchInput = document.getElementById('main-search-input');
+  const searchButton = document.getElementById('main-search-button');
+  const searchEngines = document.getElementById('search-engines');
+  
+  if (!searchInput || !searchButton || !searchEngines) return;
+  
+  // 当前选中的搜索引擎
+  let currentEngine = 'baidu';
+  
+  // 搜索引擎配置
+  const engines = {
+    baidu: {
+      name: '百度',
+      url: (query) => `https://www.baidu.com/s?wd=${encodeURIComponent(query)}`,
+      placeholder: '百度一下'
+    },
+    bing: {
+      name: 'Bing',
+      url: (query) => `https://www.bing.com/search?q=${encodeURIComponent(query)}`,
+      placeholder: 'Bing搜索'
+    },
+    google: {
+      name: 'Google',
+      url: (query) => `https://www.google.com/search?q=${encodeURIComponent(query)}`,
+      placeholder: 'Google搜索'
+    },
+    perplexity: {
+      name: 'Perplexity',
+      url: (query) => `https://www.perplexity.ai/search?q=${encodeURIComponent(query)}`,
+      placeholder: 'Perplexity搜索'
+    },
+    you: {
+      name: 'YOU',
+      url: (query) => `https://you.com/search?q=${encodeURIComponent(query)}`,
+      placeholder: 'YOU搜索'
+    },
+    '360': {
+      name: '360',
+      url: (query) => `https://www.so.com/s?q=${encodeURIComponent(query)}`,
+      placeholder: '360搜索'
+    },
+    sougou: {
+      name: '搜狗',
+      url: (query) => `https://www.sogou.com/web?query=${encodeURIComponent(query)}`,
+      placeholder: '搜狗搜索'
+    },
+    shenma: {
+      name: '神马',
+      url: (query) => `https://m.sm.cn/s?q=${encodeURIComponent(query)}`,
+      placeholder: '神马搜索'
+    }
+  };
+  
+  // 更新占位符
+  function updatePlaceholder() {
+    if (engines[currentEngine]) {
+      searchInput.placeholder = engines[currentEngine].placeholder;
+    }
+  }
+  
+  // 切换搜索引擎
+  function switchEngine(engineId) {
+    currentEngine = engineId;
+    
+    // 更新活动状态
+    searchEngines.querySelectorAll('.search-engine-item').forEach(item => {
+      item.classList.remove('active');
+      if (item.dataset.engine === engineId) {
+        item.classList.add('active');
+      }
+    });
+    
+    // 更新占位符
+    updatePlaceholder();
+  }
+  
+  // 绑定搜索引擎点击事件
+  searchEngines.querySelectorAll('.search-engine-item').forEach(item => {
+    item.addEventListener('click', () => {
+      switchEngine(item.dataset.engine);
+    });
+  });
+  
+  // 搜索按钮点击事件
+  searchButton.addEventListener('click', () => {
+    performSearch();
+  });
+  
+  // 回车键搜索
+  searchInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      performSearch();
+    }
+  });
+  
+  // 搜索功能
+  function performSearch() {
+    const query = searchInput.value.trim();
+    if (!query) return;
+    
+    const engine = engines[currentEngine];
+    if (engine) {
+      window.open(engine.url(query), '_blank');
+    }
+  }
+  
+  // 初始化
+  updatePlaceholder();
 }
 
 // 绑定事件监听器
@@ -194,6 +312,87 @@ function bindEventListeners() {
       uiRenderer.showTools(currentCategory);
     }
   });
+
+  // 绑定浮动按钮事件
+  bindFloatingActions();
+}
+
+// 绑定浮动操作按钮
+function bindFloatingActions() {
+  // 返回顶部按钮
+  const scrollTopBtn = document.getElementById('scroll-top-btn');
+  if (scrollTopBtn) {
+    scrollTopBtn.addEventListener('click', () => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  }
+
+  // 帮助按钮
+  const helpBtn = document.getElementById('help-btn');
+  if (helpBtn) {
+    helpBtn.addEventListener('click', () => {
+      alert('帮助功能开发中...');
+    });
+  }
+
+  // 文档按钮
+  const docsBtn = document.getElementById('docs-btn');
+  if (docsBtn) {
+    docsBtn.addEventListener('click', () => {
+      alert('文档功能开发中...');
+    });
+  }
+
+  // 首页按钮
+  const homeBtn = document.getElementById('home-btn');
+  if (homeBtn) {
+    homeBtn.addEventListener('click', () => {
+      if (uiRenderer) {
+        uiRenderer.showTools('all');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+  }
+
+  // 浮动主题切换按钮
+  const floatingThemeBtn = document.getElementById('floating-theme-btn');
+  if (floatingThemeBtn && themeManager) {
+    floatingThemeBtn.addEventListener('click', () => {
+      themeManager.toggleMode();
+    });
+    
+    // 初始化时更新图标
+    setTimeout(() => updateFloatingThemeIcon(), 100);
+    
+    // 监听主题变化，更新图标（通过MutationObserver监听data-theme属性变化）
+    const observer = new MutationObserver(() => {
+      updateFloatingThemeIcon();
+    });
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
+  }
+
+  // 更新浮动主题按钮图标
+  function updateFloatingThemeIcon() {
+    const floatingThemeBtn = document.getElementById('floating-theme-btn');
+    if (!floatingThemeBtn) return;
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const icon = floatingThemeBtn.querySelector('i');
+    if (icon) {
+      icon.className = isDark ? 'bi bi-sun' : 'bi bi-moon';
+      floatingThemeBtn.title = isDark ? '切换亮色模式' : '切换暗黑模式';
+    }
+  }
+
+  // 更多按钮
+  const moreBtn = document.getElementById('more-btn');
+  if (moreBtn) {
+    moreBtn.addEventListener('click', () => {
+      alert('更多功能开发中...');
+    });
+  }
 }
 
 // 处理初始化错误

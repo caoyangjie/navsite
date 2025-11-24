@@ -9,11 +9,24 @@
   
   <!-- 基础路径配置 -->
   <script>
-    // 自动检测基础路径
+    // 自动检测基础路径（兼容直接访问HTML文件的场景）
     window.BASE_PATH = (function() {
-      // 从当前路径中提取基础路径（例如 /tab）
-      const pathMatch = window.location.pathname.match(/^(\/[^\/]+)/);
-      return pathMatch ? pathMatch[1] : '';
+      const pathname = window.location.pathname || '';
+      
+      // 根目录或空路径
+      if (!pathname || pathname === '/' || pathname === '') {
+        return '';
+      }
+      
+      // 如果包含文件扩展名（例如 detail.html），只取所在目录
+      const hasExtension = /\.[^/.]+$/.test(pathname);
+      if (hasExtension) {
+        const dir = pathname.substring(0, pathname.lastIndexOf('/'));
+        return dir || '';
+      }
+      
+      // 目录路径，去掉末尾的斜杠
+      return pathname.endsWith('/') ? pathname.slice(0, -1) : pathname;
     })();
     
     // 设置基础路径辅助函数
@@ -83,33 +96,70 @@
         <span>水果导航</span>
       </div>
       <div class="mobile-actions">
-        <button id="review-btn-mobile" class="review-button login-button" title="游客申请" style="display: none;">
+        <button id="review-btn-mobile" class="review-button mobile-action-btn" title="游客申请" style="display: none;">
           <i class="bi bi-clock-history"></i>
         </button>
-        <button id="login-btn-mobile" class="login-button" title="登录">
+        <button id="bitable-manage-btn-mobile" class="mobile-action-btn" title="多维表格管理" style="display: none;">
+          <i class="bi bi-table"></i>
+        </button>
+        <button id="login-btn-mobile" class="mobile-action-btn login-button" title="登录">
           <i class="bi bi-lock"></i>
         </button>
-        <button id="theme-toggle-btn" class="theme-toggle-button" title="切换暗黑模式">
+        <button id="theme-toggle-btn" class="mobile-action-btn theme-toggle-button" title="切换暗黑模式">
           <i class="bi bi-moon"></i>
         </button>
       </div>
     </div>
   </header>
 
-  <!-- 右上角操作按钮（桌面端显示） -->
-  <div class="desktop-actions desktop-only">
-    <button id="review-btn-desktop" class="review-button login-button" title="游客申请" style="display: none;">
-      <i class="bi bi-clock-history"></i>
-      <span id="review-status-text">游客申请</span>
-    </button>
-    <button id="login-btn-desktop" class="login-button" title="登录">
-      <i class="bi bi-lock"></i>
-      <span id="login-status-text">登录</span>
-    </button>
-    <button id="desktop-theme-toggle-btn" class="theme-toggle-button" title="切换暗黑模式">
-      <i class="bi bi-moon"></i>
-    </button>
-  </div>
+  <!-- 顶部导航栏（桌面端） -->
+  <header class="top-header desktop-only">
+    <div class="header-content">
+      <div class="header-left">
+        <div class="header-logo">
+          <img src="./img/avatar.svg" alt="logo">
+          <span>水果导航</span>
+        </div>
+        <nav class="header-nav">
+          <div class="nav-dropdown">
+            <a href="#" class="nav-link dropdown-trigger">
+              <span>专业导航</span>
+              <i class="bi bi-chevron-down"></i>
+            </a>
+            <div class="dropdown-menu" id="bitable-dropdown-menu">
+              <div class="dropdown-loading">
+                <i class="bi bi-hourglass-split"></i>
+                <span>加载中...</span>
+              </div>
+            </div>
+          </div>
+          <a href="#" class="nav-link">在线工具</a>
+          <a href="#" class="nav-link">AI资源集</a>
+          <a href="#" class="nav-link">关于我们</a>
+        </nav>
+      </div>
+      <div class="header-right">
+        <button id="review-btn-desktop" class="review-button header-action-btn" title="游客申请" style="display: none;">
+          <i class="bi bi-clock-history"></i>
+          <span id="review-status-text">游客申请</span>
+        </button>
+        <button id="bitable-manage-btn-desktop" class="header-action-btn" title="多维表格管理" style="display: none;">
+          <i class="bi bi-table"></i>
+          <span>表格管理</span>
+        </button>
+        <button id="login-btn-desktop" class="header-action-btn login-button" title="登录">
+          <i class="bi bi-lock"></i>
+          <span id="login-status-text">登录</span>
+        </button>
+        <button id="desktop-theme-toggle-btn" class="header-action-btn theme-toggle-button" title="切换暗黑模式">
+          <i class="bi bi-moon"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- 右上角操作按钮（桌面端显示）- 已移动到顶部导航栏 -->
+  <div class="desktop-actions desktop-only" style="display: none;"></div>
 
   <!-- 移动端遮罩层 -->
   <div class="mobile-overlay" id="mobile-overlay"></div>
@@ -117,9 +167,6 @@
   <div class="container">
     <!-- 左侧侧边栏 -->
     <aside class="sidebar" id="sidebar">
-      <div class="user-avatar">
-        <img src="./img/avatar.svg" alt="logo" srcset="">
-      </div>
       <nav class="nav-menu">
         <ul id="category-menu">
           <li class="active" data-category="all"><i class="bi bi-house-door"></i> 全部</li>
@@ -207,26 +254,102 @@
 
     <!-- 主内容区 -->
     <main class="main-content">
-      <!-- 顶部信息区 -->
-      <header class="top-info">
-        <div class="time-info">
-          <div class="current-time" id="current-time">--:--:--</div>
-          <div class="date-info" id="date-info">加载中...</div>
+      <!-- 搜索区域 -->
+      <header class="search-section">
+        <div class="search-container">
+          <input type="text" 
+                 class="search-input" 
+                 id="main-search-input"
+                 placeholder="百度一下"
+                 autocomplete="off">
+          <button class="search-button" id="main-search-button" title="搜索">
+            <i class="bi bi-search"></i>
+          </button>
+        </div>
+        <div class="search-engine-selector">
+          <div class="search-engines" id="search-engines">
+            <span class="search-engine-item active" data-engine="baidu">百度</span>
+            <span class="search-engine-item" data-engine="bing">Bing</span>
+            <span class="search-engine-item" data-engine="google">Google</span>
+            <span class="search-engine-item" data-engine="perplexity">Perplexity</span>
+            <span class="search-engine-item" data-engine="you">YOU</span>
+            <span class="search-engine-item" data-engine="360">360</span>
+            <span class="search-engine-item" data-engine="sougou">搜狗</span>
+            <span class="search-engine-item" data-engine="shenma">神马</span>
+          </div>
         </div>
       </header>
 
-    <!-- 添加链接按钮 -->
-    <button id="add-link-btn" class="add-link-btn" title="添加网站">
-      <i class="bi bi-plus"></i>
+      <!-- 分类标签页 -->
+      <div class="category-tabs" id="category-tabs">
+        <!-- 动态生成的分类标签 -->
+      </div>
+
+      <!-- 工具图标列表 -->
+      <div class="tools-container">
+        <div id="tools-grid" class="tools-grid">
+          <!-- 动态生成的工具图标 -->
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 添加链接按钮 -->
+  <button id="add-link-btn" class="add-link-btn" title="添加网站">
+    <i class="bi bi-plus"></i>
+  </button>
+
+  <!-- 右侧浮动操作按钮 -->
+  <div class="floating-actions desktop-only">
+    <button class="floating-btn" id="scroll-top-btn" title="返回顶部">
+      <i class="bi bi-arrow-up"></i>
     </button>
-    
-    <!-- 工具图标列表 -->
-    <div class="tools-container">
-      <div id="tools-grid" class="tools-grid">
-        <!-- 动态生成的工具图标 -->
+    <button class="floating-btn" id="help-btn" title="帮助">
+      <i class="bi bi-question-circle"></i>
+    </button>
+    <button class="floating-btn" id="docs-btn" title="文档">
+      <i class="bi bi-file-text"></i>
+    </button>
+    <button class="floating-btn" id="home-btn" title="首页">
+      <i class="bi bi-house"></i>
+    </button>
+    <button class="floating-btn" id="floating-theme-btn" title="切换暗黑模式">
+      <i class="bi bi-moon"></i>
+    </button>
+    <div class="wechat-qr-container">
+      <button class="floating-btn" id="wechat-btn" title="微信二维码">
+        <i class="bi bi-wechat"></i>
+      </button>
+      <div class="wechat-qr-popup" id="wechat-qr-popup">
+        <div class="qr-code-wrapper">
+          <img src="./img/wechat-qr.png" alt="微信二维码" class="qr-code-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+          <div class="qr-code-placeholder" style="display: none;">
+            <i class="bi bi-qr-code-scan" style="font-size: 80px; color: #999;"></i>
+            <p style="margin-top: 10px; color: #999; font-size: 14px;">请添加微信二维码图片<br>路径: ./img/wechat-qr.png</p>
+          </div>
+        </div>
+        <div class="qr-arrow"></div>
       </div>
     </div>
-  </main>
+    <div class="feishu-qr-container">
+      <button class="floating-btn" id="feishu-btn" title="飞书二维码">
+        <i class="bi bi-chat-dots"></i>
+      </button>
+      <div class="feishu-qr-popup" id="feishu-qr-popup">
+        <div class="qr-code-wrapper">
+          <img src="./img/feishu-qr.png" alt="飞书二维码" class="qr-code-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+          <div class="qr-code-placeholder" style="display: none;">
+            <i class="bi bi-qr-code-scan" style="font-size: 80px; color: #999;"></i>
+            <p style="margin-top: 10px; color: #999; font-size: 14px;">请添加飞书二维码图片<br>路径: ./img/feishu-qr.png</p>
+          </div>
+        </div>
+        <div class="qr-arrow"></div>
+      </div>
+    </div>
+    <button class="floating-btn" id="more-btn" title="更多">
+      <i class="bi bi-three-dots"></i>
+    </button>
+  </div>
 </div>
 
 <!-- 添加链接模态框 -->
@@ -266,6 +389,15 @@
         <div class="form-group">
           <label for="site-sort">排序 (可选)</label>
           <input type="number" id="site-sort" name="site-sort" placeholder="数字越小，排序越靠前" min="0" max="999" value="200">
+        </div>
+        
+        <div class="form-group" id="site-table-group" style="display: none;">
+          <label for="site-table">存储表格 *</label>
+          <select id="site-table" name="site-table">
+            <option value="tbl3I3RtxgtiC7eF">默认表格</option>
+            <!-- 动态生成的表格选项 -->
+          </select>
+          <div class="error-message" id="table-error"></div>
         </div>
       </form>
     </div>
@@ -399,6 +531,81 @@
           <p>加载中...</p>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- 多维表格管理模态框 -->
+<div id="bitable-manage-modal" class="modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content admin-review-modal-content">
+    <div class="modal-header">
+      <h2>多维表格管理</h2>
+      <button id="close-bitable-manage-modal-btn" class="close-modal-btn" aria-label="关闭">
+        <i class="bi bi-x"></i>
+      </button>
+    </div>
+    
+    <div class="modal-body admin-review-modal-body">
+      <div class="bitable-manage-toolbar">
+        <button id="create-bitable-btn" class="save-btn">
+          <i class="bi bi-plus-circle"></i>
+          <span>新建表格</span>
+        </button>
+      </div>
+      
+      <div id="bitable-list-container">
+        <div class="loading-state">
+          <i class="bi bi-hourglass-split"></i>
+          <p>加载中...</p>
+        </div>
+      </div>
+      
+      <div class="pagination" id="bitable-pagination" style="display: none;">
+        <button class="pagination-btn" id="bitable-prev-btn" disabled>
+          <i class="bi bi-chevron-left"></i>
+          <span>上一页</span>
+        </button>
+        <span class="pagination-info" id="bitable-pagination-info"></span>
+        <button class="pagination-btn" id="bitable-next-btn" disabled>
+          <span>下一页</span>
+          <i class="bi bi-chevron-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 创建多维表格模态框 -->
+<div id="create-bitable-modal" class="modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>创建多维表格</h2>
+      <button id="close-create-bitable-modal-btn" class="close-modal-btn" aria-label="关闭">
+        <i class="bi bi-x"></i>
+      </button>
+    </div>
+    
+    <div class="modal-body">
+      <form id="create-bitable-form">
+        <div class="form-group">
+          <label for="bitable-name">表格名称 *</label>
+          <input type="text" id="bitable-name" name="bitable-name" placeholder="请输入表格名称" maxlength="100" required>
+          <div class="error-message" id="bitable-name-error"></div>
+        </div>
+        
+        <div class="form-group">
+          <label for="bitable-description">描述 (可选)</label>
+          <textarea id="bitable-description" name="bitable-description" placeholder="请输入表格描述" rows="3" maxlength="500"></textarea>
+          <div class="error-message" id="bitable-description-error"></div>
+        </div>
+      </form>
+    </div>
+    
+    <div class="modal-footer">
+      <button id="cancel-create-bitable-btn" class="cancel-btn">取消</button>
+      <button id="submit-create-bitable-btn" class="save-btn">创建</button>
     </div>
   </div>
 </div>
