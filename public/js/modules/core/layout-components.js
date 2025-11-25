@@ -30,7 +30,7 @@
             </button>
             <div class="mobile-logo">
               <img src="${getBase('img/avatar.jpeg')}" alt="logo">
-              <span>曹操直达</span>
+              <span>草草导航</span>
             </div>
             <div class="mobile-actions">
               <button id="review-btn-mobile" class="review-button mobile-action-btn" title="游客申请" style="display: none;">
@@ -56,7 +56,7 @@
               <div class="header-logo">
                 <a href="${homeHref}" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit;">
                   <img src="${getBase('img/avatar.jpeg')}" alt="logo">
-                  <span>曹操直达</span>
+                  <span>草草导航</span>
                 </a>
               </div>
               <nav class="header-nav">

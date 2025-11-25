@@ -1,4 +1,4 @@
-// Service Worker for 曹操直达 PWA
+// Service Worker for 草草导航 PWA
 const CACHE_NAME = 'fruit-nav-v1.2.0';
 const STATIC_CACHE_NAME = 'fruit-nav-static-v1.2.0';
 const API_CACHE_NAME = 'fruit-nav-api-v1.2.0';
@@ -277,7 +277,7 @@ self.addEventListener('push', (event) => {
   };
   
   event.waitUntil(
-    self.registration.showNotification('曹操直达', options)
+    self.registration.showNotification('草草导航', options)
   );
 });
 

@@ -1,6 +1,6 @@
 {
-  "name": "曹操直达 - 个人网站导航工具",
-  "short_name": "曹操直达",
+  "name": "草草导航 - 个人网站导航工具",
+  "short_name": "草草导航",
   "description": "基于飞书多维表格的个人网站导航工具，支持分类管理、搜索功能、暗黑模式等特性",
   "start_url": "./",
   "display": "standalone",
