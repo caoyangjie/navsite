@@ -18,7 +18,7 @@
 
   class AppTopNav extends HTMLElement {
     connectedCallback() {
-      const homeHref = getBase('index.html') || 'index.html';
+      const homeHref = getBase('/index.html') || '/index.html';
       ensureRendered(this, `
         <!-- 移动端顶部导航栏 -->
         <header class="mobile-header">
