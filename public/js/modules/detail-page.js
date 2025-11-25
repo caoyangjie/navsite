@@ -10,10 +10,25 @@ class DetailPageManager {
     this.tableId = null;
     this.SESSION_CACHE_KEY = 'navsite_selected_tool';
     this.SESSION_CACHE_DURATION = 5 * 60 * 1000; // 5分钟会话缓存
+    this.sidebarBound = false;
     this.init();
   }
 
   async init() {
+    // 检查是否在 index 页面中
+    const isIndexPage = document.body.dataset.page === 'index' || 
+                        window.location.pathname.includes('index.html') ||
+                        window.location.pathname === '/' ||
+                        window.location.pathname.endsWith('/');
+    
+    // 如果在 index 页面中，不自动加载详情，只绑定返回列表按钮
+    if (isIndexPage) {
+      await this.waitForAppInit();
+      this.bindBackToListButton();
+      return;
+    }
+
+    // 如果运行在独立详情上下文（兼容旧版本），执行完整初始化流程
     const params = new URLSearchParams(window.location.search);
     const toolId = params.get('id');
     const toolName = params.get('name');
@@ -437,31 +452,31 @@ class DetailPageManager {
       {
         title: '免费一键AI生图',
         description: '快速生成高质量图片',
-        image: 'https://via.placeholder.com/280x200?text=AI生图',
+        image: './img/AIGenerate.png',
         link: '#'
       },
       {
         title: '快速文生AI视频',
         description: '文本转视频工具',
-        image: 'https://via.placeholder.com/280x200?text=AI视频',
+        image: './img/AIVideo.png',
         link: '#'
       },
       {
         title: '抠图/放大/去水印',
         description: '图片处理工具',
-        image: 'https://via.placeholder.com/280x200?text=图片处理',
+        image: './img/AIKouTu.png',
         link: '#'
       },
       {
         title: 'AI电商/模特换脸',
         description: 'AI换脸工具',
-        image: 'https://via.placeholder.com/280x200?text=AI换脸',
+        image: './img/AIFace.png',
         link: '#'
       },
       {
         title: '海报资源素材',
         description: '设计素材库',
-        image: 'https://via.placeholder.com/280x200?text=设计素材',
+        image: './img/AIResource.png',
         link: '#'
       }
     ];
@@ -604,7 +619,28 @@ class DetailPageManager {
       card.className = 'related-nav-card';
       const relatedTableId = tool.tableId || (this.currentTool ? this.currentTool.tableId : '');
       const tableQuery = relatedTableId ? `&table_id=${encodeURIComponent(relatedTableId)}` : '';
-      card.href = `detail.html?id=${tool.id || ''}&name=${encodeURIComponent(tool.name || '')}&url=${encodeURIComponent(this.getToolUrl(tool))}${tableQuery}`;
+      
+      // 检查是否在 index 页面中
+      const isIndexPage = document.body.dataset.page === 'index' || 
+                          window.location.pathname.includes('index.html') ||
+                          window.location.pathname === '/' ||
+                          window.location.pathname.endsWith('/');
+
+      const basePath = window.BASE_PATH || '';
+      const fallbackLink = `${basePath}/index.html?id=${tool.id || ''}&name=${encodeURIComponent(tool.name || '')}&url=${encodeURIComponent(this.getToolUrl(tool))}${tableQuery}`;
+
+      // 如果在 index 页面中，使用 # 作为占位符链接，实际跳转由 updateRelatedNavLinks 处理
+      // 如果不在 index 页面，使用 index.html 作为回退链接
+      card.href = isIndexPage ? '#' : fallbackLink;
+      
+      // 存储工具数据以便在 index 页面中使用
+      if (isIndexPage) {
+        card.dataset.toolId = tool.id || '';
+        card.dataset.toolName = tool.name || '';
+        card.dataset.toolUrl = this.getToolUrl(tool);
+        card.dataset.toolTableId = relatedTableId;
+        card.dataset.toolCategory = tool.category || '';
+      }
 
       // 图标
       const icon = document.createElement('div');
@@ -629,6 +665,9 @@ class DetailPageManager {
       card.appendChild(arrow);
       container.appendChild(card);
     });
+
+    // 更新相关导航链接以支持在 index 页面中显示详情
+    this.updateRelatedNavLinks();
   }
 
   getRelatedIconTemplate(tool) {
@@ -798,22 +837,8 @@ class DetailPageManager {
     if (window.uiRenderer && window.dataManager) {
       try {
         window.uiRenderer.generateCategoryMenu();
-        
-        // 绑定分类菜单点击事件
-        const categoryMenu = document.getElementById('category-menu');
-        if (categoryMenu) {
-          categoryMenu.addEventListener('click', (e) => {
-            const li = e.target.closest('li[data-category]');
-            if (li) {
-              const category = li.getAttribute('data-category');
-              if (category === 'all') {
-                window.location.href = 'index.html';
-              } else {
-                window.location.href = `index.html?category=${encodeURIComponent(category)}`;
-              }
-            }
-          });
-        }
+        this.highlightSidebarCategory(this.currentTool?.category || 'all');
+        this.bindSidebarInteractions();
       } catch (error) {
         console.error('初始化侧边栏失败:', error);
       }
@@ -855,12 +880,20 @@ class DetailPageManager {
 
     // 浮动主题切换按钮
     const floatingThemeBtn = document.getElementById('floating-theme-btn');
-    if (floatingThemeBtn && this.themeManager) {
-      floatingThemeBtn.addEventListener('click', () => {
-        if (this.themeManager) {
-          this.themeManager.toggleMode();
+    if (floatingThemeBtn && window.themeManager) {
+      // 移除可能存在的旧事件监听器（通过克隆节点）
+      const newBtn = floatingThemeBtn.cloneNode(true);
+      floatingThemeBtn.parentNode.replaceChild(newBtn, floatingThemeBtn);
+      
+      // 绑定新的点击事件
+      newBtn.addEventListener('click', () => {
+        if (window.themeManager) {
+          window.themeManager.toggleMode();
         }
       });
+      
+      // 更新图标
+      this.updateFloatingThemeIcon();
     }
 
     // 微信二维码按钮
@@ -901,6 +934,18 @@ class DetailPageManager {
       moreBtn.addEventListener('click', () => {
         alert('更多功能开发中...');
       });
+    }
+  }
+
+  // 更新浮动主题按钮图标
+  updateFloatingThemeIcon() {
+    const floatingThemeBtn = document.getElementById('floating-theme-btn');
+    if (!floatingThemeBtn) return;
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const icon = floatingThemeBtn.querySelector('i');
+    if (icon) {
+      icon.className = isDark ? 'bi bi-sun' : 'bi bi-moon';
+      floatingThemeBtn.title = isDark ? '切换亮色模式' : '切换暗黑模式';
     }
   }
 
@@ -1035,6 +1080,225 @@ class DetailPageManager {
         </div>
       `;
     }
+  }
+
+  bindSidebarInteractions() {
+    if (this.sidebarBound) return;
+    const categoryMenu = document.getElementById('category-menu');
+    if (!categoryMenu) return;
+
+    categoryMenu.addEventListener('click', async (e) => {
+      const li = e.target.closest('li[data-category]');
+      if (!li) return;
+      e.preventDefault();
+      const category = li.getAttribute('data-category');
+      await this.handleSidebarSelection(category);
+    });
+
+    this.sidebarBound = true;
+  }
+
+  highlightSidebarCategory(category) {
+    const categoryMenu = document.getElementById('category-menu');
+    if (!categoryMenu) return;
+    const items = categoryMenu.querySelectorAll('li[data-category]');
+    items.forEach(item => {
+      const itemCategory = item.getAttribute('data-category');
+      if (
+        (category === 'all' && itemCategory === 'all') ||
+        (category && itemCategory === category)
+      ) {
+        item.classList.add('active');
+      } else {
+        item.classList.remove('active');
+      }
+    });
+  }
+
+  async handleSidebarSelection(category) {
+    if (!window.dataManager || !category) return;
+
+    this.highlightSidebarCategory(category);
+
+    const navigationData = await this.ensureNavigationDataLoaded(false);
+    if (!navigationData) {
+      this.showError('无法加载分类数据');
+      return;
+    }
+
+    let nextTool = null;
+    if (category === 'all') {
+      nextTool = this.getDefaultToolFromNavigation(navigationData);
+    } else {
+      nextTool = this.getFirstToolForCategory(category, navigationData);
+    }
+
+    if (!nextTool) {
+      this.showError('该分类暂无数据');
+      return;
+    }
+
+    const normalized = this.normalizeTool(nextTool, category === 'all' ? nextTool.category : category);
+    const needRerender = !this.isSameTool(this.currentTool, normalized);
+    this.currentTool = normalized;
+    this.cacheToolForSession(this.currentTool);
+    if (needRerender) {
+      await this.renderDetail();
+      this.scrollDetailIntoView();
+    }
+  }
+
+  getFirstToolForCategory(category, navigationData) {
+    if (!navigationData || !navigationData[category] || navigationData[category].length === 0) {
+      return null;
+    }
+    return navigationData[category][0];
+  }
+
+  getDefaultToolFromNavigation(navigationData) {
+    if (!navigationData) return null;
+    for (const category in navigationData) {
+      if (Array.isArray(navigationData[category]) && navigationData[category].length > 0) {
+        return navigationData[category][0];
+      }
+    }
+    return null;
+  }
+
+  scrollDetailIntoView() {
+    const introSection = document.querySelector('.detail-intro-card');
+    if (introSection) {
+      introSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  // 绑定返回列表按钮
+  bindBackToListButton() {
+    const backBtn = document.getElementById('back-to-list-btn');
+    if (backBtn) {
+      backBtn.addEventListener('click', () => {
+        if (window.uiRenderer) {
+          window.uiRenderer.hideDetailView();
+        }
+      });
+    }
+  }
+
+  // 加载并渲染详情（供 UI renderer 调用）
+  async loadAndRenderDetail(toolData) {
+    if (!toolData) {
+      console.error('loadAndRenderDetail: toolData is required');
+      return;
+    }
+
+    // 等待 app.js 加载完成
+    await this.waitForAppInit();
+
+    // 加载模块
+    await this.loadModules();
+
+    // 初始化主题管理器（如果app.js没有初始化）
+    if (!window.themeManager && window.ThemeManager) {
+      this.themeManager = new window.ThemeManager();
+      window.themeManager = this.themeManager;
+    } else if (window.themeManager) {
+      this.themeManager = window.themeManager;
+    }
+
+    // 设置当前工具数据
+    this.currentTool = toolData;
+    this.tableId = toolData.tableId || null;
+
+    // 确保表格上下文正确
+    if (this.tableId && window.dataManager && window.dataManager.setTableId) {
+      window.dataManager.setTableId(this.tableId);
+    }
+
+    // 缓存工具数据
+    this.cacheToolForSession(this.currentTool);
+
+    // 渲染详情
+    await this.renderDetail();
+
+    // 绑定事件（如果还没有绑定）
+    this.bindEvents();
+    this.initSidebar();
+    this.bindFloatingActions();
+    this.bindBackToListButton();
+
+    // 修改相关导航链接，使其在 index 页面中也能正确显示详情
+    this.updateRelatedNavLinks();
+  }
+
+  // 更新相关导航链接，使其在 index 页面中也能正确显示详情
+  updateRelatedNavLinks() {
+    const relatedNavCards = document.querySelectorAll('.related-nav-card');
+    const isIndexPage = document.body.dataset.page === 'index' || 
+                        window.location.pathname.includes('index.html') ||
+                        window.location.pathname === '/' ||
+                        window.location.pathname.endsWith('/');
+
+    if (!isIndexPage) {
+      // 不在 index 页面，保持原有行为
+      return;
+    }
+
+    relatedNavCards.forEach(card => {
+      // 移除之前绑定的事件监听器（如果存在）
+      const newCard = card.cloneNode(true);
+      card.parentNode.replaceChild(newCard, card);
+
+      newCard.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // 优先使用 dataset 中的数据
+        const toolId = newCard.dataset.toolId;
+        const toolName = newCard.dataset.toolName;
+        const toolUrl = newCard.dataset.toolUrl;
+        const tableId = newCard.dataset.toolTableId;
+        const toolCategory = newCard.dataset.toolCategory;
+
+        // 尝试从 dataManager 中查找工具数据
+        if (window.dataManager && window.uiRenderer) {
+          const { navigationData } = window.dataManager.getCurrentData();
+          let toolData = null;
+
+          // 在所有分类中查找匹配的工具
+          if (toolId || toolName) {
+            for (const category in navigationData) {
+              const match = navigationData[category].find(t => {
+                if (toolId) return t.id === toolId;
+                if (toolName) return t.name === toolName;
+                return false;
+              });
+              if (match) {
+                toolData = {
+                  ...match,
+                  category: match.category || toolCategory || category,
+                  tableId: match.tableId || tableId || (window.dataManager.getCurrentTableId ? window.dataManager.getCurrentTableId() : '')
+                };
+                break;
+              }
+            }
+          }
+
+          if (toolData) {
+            window.uiRenderer.showDetailView(toolData);
+          } else if (toolName) {
+            // 如果找不到，使用 dataset 数据创建临时工具对象
+            const tempTool = {
+              id: toolId || `temp_${Date.now()}`,
+              name: toolName || '',
+              url: toolUrl || '',
+              category: toolCategory || '',
+              tableId: tableId || ''
+            };
+            window.uiRenderer.showDetailView(tempTool);
+          }
+        }
+      });
+    });
   }
 }
 

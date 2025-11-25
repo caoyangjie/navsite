@@ -4,8 +4,15 @@
  */
 
 // 获取基础路径辅助函数
-function getBasePath() {
-  return window.BASE_PATH || '';
+function getBasePath(path) {
+  if( path === undefined ) {
+    return window.BASE_PATH || '';
+  }
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('//')) {
+    return path;
+  }
+  const base = window.BASE_PATH || '';
+  return base + path;
 }
 
 // 加载模块脚本
@@ -294,7 +301,19 @@ function bindEventListeners() {
   // 主页菜单项点击事件
   const homeMenuItem = document.querySelector('[data-category="all"]');
   if (homeMenuItem) {
-    homeMenuItem.addEventListener('click', () => uiRenderer.showTools('all'));
+    homeMenuItem.addEventListener('click', () => {
+      // 如果当前显示详情视图，先返回到列表视图
+      if (uiRenderer && uiRenderer.isDetailViewVisible && uiRenderer.isDetailViewVisible()) {
+        uiRenderer.hideDetailView();
+        // 延迟一下再显示全部工具，确保视图切换动画完成
+        setTimeout(() => {
+          uiRenderer.showTools('all');
+        }, 100);
+      } else {
+        // 直接显示全部工具
+        uiRenderer.showTools('all');
+      }
+    });
   }
 
   // 数据变更事件监听器
@@ -354,24 +373,36 @@ function bindFloatingActions() {
     });
   }
 
-  // 浮动主题切换按钮
-  const floatingThemeBtn = document.getElementById('floating-theme-btn');
-  if (floatingThemeBtn && themeManager) {
-    floatingThemeBtn.addEventListener('click', () => {
-      themeManager.toggleMode();
-    });
-    
-    // 初始化时更新图标
-    setTimeout(() => updateFloatingThemeIcon(), 100);
-    
-    // 监听主题变化，更新图标（通过MutationObserver监听data-theme属性变化）
-    const observer = new MutationObserver(() => {
-      updateFloatingThemeIcon();
-    });
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-theme']
-    });
+  // 浮动主题切换按钮 - 使用延迟绑定，确保自定义元素已渲染
+  function bindFloatingThemeButton() {
+    const floatingThemeBtn = document.getElementById('floating-theme-btn');
+    if (floatingThemeBtn && window.themeManager) {
+      // 移除可能存在的旧事件监听器
+      const newBtn = floatingThemeBtn.cloneNode(true);
+      floatingThemeBtn.parentNode.replaceChild(newBtn, floatingThemeBtn);
+      
+      // 绑定新的点击事件
+      newBtn.addEventListener('click', () => {
+        if (window.themeManager) {
+          window.themeManager.toggleMode();
+        }
+      });
+      
+      // 初始化时更新图标
+      setTimeout(() => updateFloatingThemeIcon(), 100);
+      
+      // 监听主题变化，更新图标（通过MutationObserver监听data-theme属性变化）
+      const observer = new MutationObserver(() => {
+        updateFloatingThemeIcon();
+      });
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-theme']
+      });
+    } else if (!floatingThemeBtn) {
+      // 如果按钮还不存在，延迟重试
+      setTimeout(bindFloatingThemeButton, 100);
+    }
   }
 
   // 更新浮动主题按钮图标
@@ -385,6 +416,9 @@ function bindFloatingActions() {
       floatingThemeBtn.title = isDark ? '切换亮色模式' : '切换暗黑模式';
     }
   }
+
+  // 尝试绑定浮动主题按钮（延迟执行，确保自定义元素已渲染）
+  setTimeout(bindFloatingThemeButton, 200);
 
   // 更多按钮
   const moreBtn = document.getElementById('more-btn');

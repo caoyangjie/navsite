@@ -6,6 +6,7 @@ class UIRenderer {
     this.dataManager = dataManager;
     this.currentCategory = 'all';
     this.faviconCache = new Map();
+    this.pageType = (document.body && document.body.dataset && document.body.dataset.page) ? document.body.dataset.page : 'index';
     
     // DOM元素引用
     this.categoryMenu = document.getElementById('category-menu');
@@ -44,7 +45,21 @@ class UIRenderer {
       }
 
       li.innerHTML = `<i class="bi ${iconClass}"></i> ${category}`;
-      li.addEventListener('click', () => this.showTools(category));
+      if (this.pageType !== 'detail') {
+        li.addEventListener('click', () => {
+          // 如果当前显示详情视图，先返回到列表视图
+          if (this.isDetailViewVisible()) {
+            this.hideDetailView();
+            // 延迟一下再切换分类，确保视图切换动画完成
+            setTimeout(() => {
+              this.showTools(category);
+            }, 100);
+          } else {
+            // 直接显示分类工具
+            this.showTools(category);
+          }
+        });
+      }
       this.categoryMenu.appendChild(li);
     });
 
@@ -65,17 +80,23 @@ class UIRenderer {
     this.currentCategory = category;
 
     // 更新菜单项激活状态
-    const menuItems = this.categoryMenu.querySelectorAll('li');
-    menuItems.forEach(item => {
-      if (
-        (category === 'all' && item.getAttribute('data-category') === 'all') ||
-        item.getAttribute('data-category') === category
-      ) {
-        item.classList.add('active');
-      } else {
-        item.classList.remove('active');
-      }
-    });
+    if (this.categoryMenu) {
+      const menuItems = this.categoryMenu.querySelectorAll('li');
+      menuItems.forEach(item => {
+        if (
+          (category === 'all' && item.getAttribute('data-category') === 'all') ||
+          item.getAttribute('data-category') === category
+        ) {
+          item.classList.add('active');
+        } else {
+          item.classList.remove('active');
+        }
+      });
+    }
+
+    if (!this.toolsGrid) {
+      return;
+    }
 
     // 清空工具网格
     this.toolsGrid.innerHTML = '';
@@ -185,7 +206,7 @@ class UIRenderer {
     // 构建详情页URL
     const basePath = window.BASE_PATH || '';
     const tableParam = tool.tableId ? `&table_id=${encodeURIComponent(tool.tableId)}` : '';
-    const detailUrl = `${basePath}/detail.html?id=${encodeURIComponent(tool.id || '')}&name=${encodeURIComponent(tool.name || '')}&url=${encodeURIComponent(urlString)}${tool.description ? '&description=' + encodeURIComponent(tool.description) : ''}${tool.category ? '&category=' + encodeURIComponent(tool.category) : ''}${tableParam}`;
+    const detailUrl = `${basePath}/index.html?id=${encodeURIComponent(tool.id || '')}&name=${encodeURIComponent(tool.name || '')}&url=${encodeURIComponent(urlString)}${tool.description ? '&description=' + encodeURIComponent(tool.description) : ''}${tool.category ? '&category=' + encodeURIComponent(tool.category) : ''}${tableParam}`;
     
     linkElement.href = detailUrl;
     linkElement.target = '_self'; // 在当前窗口打开详情页
@@ -267,12 +288,34 @@ class UIRenderer {
     linkElement.appendChild(toolContentWrapper);
 
     // 缓存当前点击的导航数据，提升详情页加载速度
-    linkElement.addEventListener('click', () => {
-      this.cacheSelectedTool({
-        ...tool,
-        category: resolvedCategory,
-        tableId: tool.tableId || (this.dataManager && this.dataManager.getCurrentTableId ? this.dataManager.getCurrentTableId() : '')
-      });
+    linkElement.addEventListener('click', (e) => {
+      // 检查是否在 index 页面
+      const isIndexPage = document.body.dataset.page === 'index' || 
+                          window.location.pathname.includes('index.html') ||
+                          window.location.pathname === '/' ||
+                          window.location.pathname.endsWith('/');
+      
+      if (isIndexPage) {
+        // 在 index 页面中，阻止默认跳转，显示详情视图
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const toolData = {
+          ...tool,
+          category: resolvedCategory,
+          tableId: tool.tableId || (this.dataManager && this.dataManager.getCurrentTableId ? this.dataManager.getCurrentTableId() : '')
+        };
+        
+        this.cacheSelectedTool(toolData);
+        this.showDetailView(toolData);
+      } else {
+        // 在其他页面（如旧版的独立详情页），保持原有跳转行为
+        this.cacheSelectedTool({
+          ...tool,
+          category: resolvedCategory,
+          tableId: tool.tableId || (this.dataManager && this.dataManager.getCurrentTableId ? this.dataManager.getCurrentTableId() : '')
+        });
+      }
     }, { once: false });
 
     // 检查是否为管理员（仅在管理员登录时显示编辑和删除按钮）
@@ -593,6 +636,68 @@ class UIRenderer {
   // 获取当前分类
   getCurrentCategory() {
     return this.currentCategory;
+  }
+
+  // 在 index 页面中显示详情视图
+  showDetailView(toolData) {
+    const mainContent = document.getElementById('main-content');
+    const detailContainer = document.getElementById('detail-view-container');
+    
+    if (!mainContent || !detailContainer) {
+      // 如果没有找到容器，回退到跳转行为
+      const basePath = window.BASE_PATH || '';
+      const tableParam = toolData.tableId ? `&table_id=${encodeURIComponent(toolData.tableId)}` : '';
+      const urlString = typeof toolData.url === 'string' ? toolData.url : (toolData.url?.link || toolData.url?.text || '');
+      const detailUrl = `${basePath}/index.html?id=${encodeURIComponent(toolData.id || '')}&name=${encodeURIComponent(toolData.name || '')}&url=${encodeURIComponent(urlString)}${toolData.description ? '&description=' + encodeURIComponent(toolData.description) : ''}${toolData.category ? '&category=' + encodeURIComponent(toolData.category) : ''}${tableParam}`;
+      window.location.href = detailUrl;
+      return;
+    }
+
+    // 隐藏主内容，显示详情视图
+    mainContent.style.display = 'none';
+    detailContainer.style.display = 'block';
+
+    // 触发详情页管理器加载详情
+    if (window.detailPageManager) {
+      // 如果详情页管理器已存在，直接加载详情
+      window.detailPageManager.loadAndRenderDetail(toolData);
+    } else {
+      // 如果详情页管理器不存在，等待它初始化
+      const checkInterval = setInterval(() => {
+        if (window.detailPageManager) {
+          clearInterval(checkInterval);
+          window.detailPageManager.loadAndRenderDetail(toolData);
+        }
+      }, 100);
+      
+      // 超时后放弃
+      setTimeout(() => {
+        clearInterval(checkInterval);
+      }, 5000);
+    }
+
+    // 滚动到顶部
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // 隐藏详情视图，返回工具列表
+  hideDetailView() {
+    const mainContent = document.getElementById('main-content');
+    const detailContainer = document.getElementById('detail-view-container');
+    
+    if (mainContent && detailContainer) {
+      detailContainer.style.display = 'none';
+      mainContent.style.display = 'block';
+      
+      // 滚动到顶部
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
+
+  // 检查当前是否显示详情视图
+  isDetailViewVisible() {
+    const detailContainer = document.getElementById('detail-view-container');
+    return detailContainer && detailContainer.style.display !== 'none';
   }
 }
 

@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport"
     content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>水果导航</title>
+  <title>曹操直达</title>
   
   <!-- 基础路径配置 -->
   <script>
@@ -18,7 +18,7 @@
         return '';
       }
       
-      // 如果包含文件扩展名（例如 detail.html），只取所在目录
+      // 如果包含文件扩展名（例如其他HTML文件），只取所在目录
       const hasExtension = /\.[^/.]+$/.test(pathname);
       if (hasExtension) {
         const dir = pathname.substring(0, pathname.lastIndexOf('/'));
@@ -45,10 +45,10 @@
   <link rel="manifest" href="" id="manifest-link">
   
   <!-- PWA Meta Tags -->
-  <meta name="application-name" content="水果导航">
+  <meta name="application-name" content="曹操直达">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="水果导航">
+  <meta name="apple-mobile-web-app-title" content="曹操直达">
   <meta name="description" content="基于飞书多维表格的个人网站导航工具，支持分类管理、搜索功能、暗黑模式等特性">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="msapplication-config" content="browserconfig.xml">
@@ -78,182 +78,20 @@
   
   <!-- Stylesheets -->
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/detail.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  <script defer src="js/modules/core/layout-components.js"></script>
 </head>
 
-<body>
-  <!-- 移动端顶部导航栏 -->
-  <header class="mobile-header">
-    <div class="mobile-nav">
-      <button class="hamburger-btn" id="hamburger-btn" aria-label="打开菜单">
-        <span></span>
-        <span></span>
-        <span></span>
-      </button>
-      <div class="mobile-logo">
-        <img src="./img/avatar.svg" alt="logo" srcset="">
-        <span>水果导航</span>
-      </div>
-      <div class="mobile-actions">
-        <button id="review-btn-mobile" class="review-button mobile-action-btn" title="游客申请" style="display: none;">
-          <i class="bi bi-clock-history"></i>
-        </button>
-        <button id="bitable-manage-btn-mobile" class="mobile-action-btn" title="多维表格管理" style="display: none;">
-          <i class="bi bi-table"></i>
-        </button>
-        <button id="login-btn-mobile" class="mobile-action-btn login-button" title="登录">
-          <i class="bi bi-lock"></i>
-        </button>
-        <button id="theme-toggle-btn" class="mobile-action-btn theme-toggle-button" title="切换暗黑模式">
-          <i class="bi bi-moon"></i>
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <!-- 顶部导航栏（桌面端） -->
-  <header class="top-header desktop-only">
-    <div class="header-content">
-      <div class="header-left">
-        <div class="header-logo">
-          <img src="./img/avatar.svg" alt="logo">
-          <span>水果导航</span>
-        </div>
-        <nav class="header-nav">
-          <div class="nav-dropdown">
-            <a href="#" class="nav-link dropdown-trigger">
-              <span>专业导航</span>
-              <i class="bi bi-chevron-down"></i>
-            </a>
-            <div class="dropdown-menu" id="bitable-dropdown-menu">
-              <div class="dropdown-loading">
-                <i class="bi bi-hourglass-split"></i>
-                <span>加载中...</span>
-              </div>
-            </div>
-          </div>
-          <a href="#" class="nav-link">在线工具</a>
-          <a href="#" class="nav-link">AI资源集</a>
-          <a href="#" class="nav-link">关于我们</a>
-        </nav>
-      </div>
-      <div class="header-right">
-        <button id="review-btn-desktop" class="review-button header-action-btn" title="游客申请" style="display: none;">
-          <i class="bi bi-clock-history"></i>
-          <span id="review-status-text">游客申请</span>
-        </button>
-        <button id="bitable-manage-btn-desktop" class="header-action-btn" title="多维表格管理" style="display: none;">
-          <i class="bi bi-table"></i>
-          <span>表格管理</span>
-        </button>
-        <button id="login-btn-desktop" class="header-action-btn login-button" title="登录">
-          <i class="bi bi-lock"></i>
-          <span id="login-status-text">登录</span>
-        </button>
-        <button id="desktop-theme-toggle-btn" class="header-action-btn theme-toggle-button" title="切换暗黑模式">
-          <i class="bi bi-moon"></i>
-        </button>
-      </div>
-    </div>
-  </header>
-
-  <!-- 右上角操作按钮（桌面端显示）- 已移动到顶部导航栏 -->
-  <div class="desktop-actions desktop-only" style="display: none;"></div>
-
-  <!-- 移动端遮罩层 -->
-  <div class="mobile-overlay" id="mobile-overlay"></div>
+<body data-page="index">
+  <app-top-nav></app-top-nav>
 
   <div class="container">
-    <!-- 左侧侧边栏 -->
-    <aside class="sidebar" id="sidebar">
-      <nav class="nav-menu">
-        <ul id="category-menu">
-          <li class="active" data-category="all"><i class="bi bi-house-door"></i> 全部</li>
-          <!-- 动态生成的分类菜单项 --> 
-        </ul>
+    <app-sidebar></app-sidebar>
 
-        
-        <!-- 皮肤选择器 -->
-        <div class="skin-selector" id="skin-selector">
-          <div class="current-skin">
-            <div class="current-skin-preview">
-              <i class="bi bi-stars current-skin-icon"></i>
-            </div>
-            <span class="current-skin-name">霓虹风格</span>
-            <button class="skin-expand-btn">
-              <i class="bi bi-chevron-down"></i>
-            </button>
-          </div>
-          
-          <div class="skin-options">
-            <div class="skin-grid">
-              <div class="skin-option active" data-skin="neon">
-                <div class="skin-colors">
-                  <div class="color-dot primary"></div>
-                  <div class="color-dot secondary"></div>
-                  <div class="color-dot accent"></div>
-                </div>
-                <span class="skin-label">霓虹风格</span>
-              </div>
-              
-              <div class="skin-option" data-skin="ocean">
-                <div class="skin-colors">
-                  <div class="color-dot primary"></div>
-                  <div class="color-dot secondary"></div>
-                  <div class="color-dot accent"></div>
-                </div>
-                <span class="skin-label">海洋蓝调</span>
-              </div>
-              
-              <div class="skin-option" data-skin="forest">
-                <div class="skin-colors">
-                  <div class="color-dot primary"></div>
-                  <div class="color-dot secondary"></div>
-                  <div class="color-dot accent"></div>
-                </div>
-                <span class="skin-label">森林绿意</span>
-              </div>
-              
-              <div class="skin-option" data-skin="sunset">
-                <div class="skin-colors">
-                  <div class="color-dot primary"></div>
-                  <div class="color-dot secondary"></div>
-                  <div class="color-dot accent"></div>
-                </div>
-                <span class="skin-label">日落橙黄</span>
-              </div>
-              
-              <div class="skin-option" data-skin="purple">
-                <div class="skin-colors">
-                  <div class="color-dot primary"></div>
-                  <div class="color-dot secondary"></div>
-                  <div class="color-dot accent"></div>
-                </div>
-                <span class="skin-label">优雅紫色</span>
-              </div>
-              
-              <div class="skin-option" data-skin="classic">
-                <div class="skin-colors">
-                  <div class="color-dot primary"></div>
-                  <div class="color-dot secondary"></div>
-                  <div class="color-dot accent"></div>
-                </div>
-                <span class="skin-label">经典灰调</span>
-              </div>
-            </div>
-            
-            <div class="skin-mode-toggle">
-              <i class="bi bi-moon"></i>
-              <span>暗黑模式</span>
-            </div>
-          </div>
-        </div>
-      </nav>
-    </aside>
-
-    <!-- 主内容区 -->
-    <main class="main-content">
+    <!-- 主内容区 - 工具列表视图 -->
+    <main class="main-content" id="main-content">
       <!-- 搜索区域 -->
       <header class="search-section">
         <div class="search-container">
@@ -292,6 +130,15 @@
         </div>
       </div>
     </main>
+
+    <!-- 详情页视图 -->
+    <div class="detail-view-container" id="detail-view-container" style="display: none;">
+      <button class="back-to-list-btn" id="back-to-list-btn" title="返回列表">
+        <i class="bi bi-arrow-left"></i>
+        <span>返回列表</span>
+      </button>
+      <detail-main></detail-main>
+    </div>
   </div>
 
   <!-- 添加链接按钮 -->
@@ -299,58 +146,7 @@
     <i class="bi bi-plus"></i>
   </button>
 
-  <!-- 右侧浮动操作按钮 -->
-  <div class="floating-actions desktop-only">
-    <button class="floating-btn" id="scroll-top-btn" title="返回顶部">
-      <i class="bi bi-arrow-up"></i>
-    </button>
-    <button class="floating-btn" id="help-btn" title="帮助">
-      <i class="bi bi-question-circle"></i>
-    </button>
-    <button class="floating-btn" id="docs-btn" title="文档">
-      <i class="bi bi-file-text"></i>
-    </button>
-    <button class="floating-btn" id="home-btn" title="首页">
-      <i class="bi bi-house"></i>
-    </button>
-    <button class="floating-btn" id="floating-theme-btn" title="切换暗黑模式">
-      <i class="bi bi-moon"></i>
-    </button>
-    <div class="wechat-qr-container">
-      <button class="floating-btn" id="wechat-btn" title="微信二维码">
-        <i class="bi bi-wechat"></i>
-      </button>
-      <div class="wechat-qr-popup" id="wechat-qr-popup">
-        <div class="qr-code-wrapper">
-          <img src="./img/wechat-qr.png" alt="微信二维码" class="qr-code-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-          <div class="qr-code-placeholder" style="display: none;">
-            <i class="bi bi-qr-code-scan" style="font-size: 80px; color: #999;"></i>
-            <p style="margin-top: 10px; color: #999; font-size: 14px;">请添加微信二维码图片<br>路径: ./img/wechat-qr.png</p>
-          </div>
-        </div>
-        <div class="qr-arrow"></div>
-      </div>
-    </div>
-    <div class="feishu-qr-container">
-      <button class="floating-btn" id="feishu-btn" title="飞书二维码">
-        <i class="bi bi-chat-dots"></i>
-      </button>
-      <div class="feishu-qr-popup" id="feishu-qr-popup">
-        <div class="qr-code-wrapper">
-          <img src="./img/feishu-qr.png" alt="飞书二维码" class="qr-code-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-          <div class="qr-code-placeholder" style="display: none;">
-            <i class="bi bi-qr-code-scan" style="font-size: 80px; color: #999;"></i>
-            <p style="margin-top: 10px; color: #999; font-size: 14px;">请添加飞书二维码图片<br>路径: ./img/feishu-qr.png</p>
-          </div>
-        </div>
-        <div class="qr-arrow"></div>
-      </div>
-    </div>
-    <button class="floating-btn" id="more-btn" title="更多">
-      <i class="bi bi-three-dots"></i>
-    </button>
-  </div>
-</div>
+  <app-floating-actions></app-floating-actions>
 
 <!-- 添加链接模态框 -->
 <div id="add-link-modal" class="modal">
@@ -611,5 +407,6 @@
 </div>
 
   <script src="js/app.js"></script>
+  <script src="js/modules/detail-page.js"></script>
 </body>
 </html>

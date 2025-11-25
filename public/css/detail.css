@@ -1,5 +1,86 @@
 /* 详情页样式 */
 
+/* 详情页视图容器（在 index 页面中） */
+.detail-view-container {
+  flex: 1;
+  position: relative;
+  padding: 0;
+  min-height: calc(100vh - 64px);
+  box-sizing: border-box;
+}
+
+.detail-view-container .detail-container {
+  padding: 100px 24px 40px;
+  padding-left: calc(240px + 24px);
+}
+
+@media (max-width: 1024px) {
+  .detail-view-container .detail-container {
+    padding-left: 24px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .detail-view-container {
+    padding-left: 24px;
+  }
+}
+
+/* 返回列表按钮 */
+.back-to-list-btn {
+  position: absolute;
+  top: 20px;
+  left: calc(240px + 44px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--tool-item-bg);
+  border: 1px solid var(--border-glass);
+  border-radius: 8px;
+  color: var(--text-color);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.back-to-list-btn:hover {
+  background: var(--menu-hover-bg);
+  border-color: var(--menu-active-color);
+  color: var(--menu-active-color);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.back-to-list-btn i {
+  font-size: 16px;
+}
+
+.back-to-list-btn span {
+  display: inline;
+}
+
+@media (max-width: 1024px) {
+  .back-to-list-btn {
+    left: 24px;
+  }
+}
+
+@media (max-width: 768px) {
+  .back-to-list-btn span {
+    display: none;
+  }
+  .back-to-list-btn {
+    padding: 10px;
+    width: 44px;
+    height: 44px;
+    justify-content: center;
+  }
+}
+
 /* 详情页容器 - 在主内容区 */
 .detail-container {
   display: flex;
