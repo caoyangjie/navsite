@@ -29,7 +29,7 @@
               <span></span>
             </button>
             <div class="mobile-logo">
-              <img src="${getBase('img/avatar.jpeg')}" alt="logo">
+              <img src="${getBase('/img/avatar.jpeg')}" alt="logo">
               <span>草草导航</span>
             </div>
             <div class="mobile-actions">
@@ -55,7 +55,7 @@
             <div class="header-left">
               <div class="header-logo">
                 <a href="${homeHref}" style="display: flex; align-items: center; gap: 12px; text-decoration: none; color: inherit;">
-                  <img src="${getBase('img/avatar.jpeg')}" alt="logo">
+                  <img src="${getBase('/img/avatar.jpeg')}" alt="logo">
                   <span>草草导航</span>
                 </a>
               </div>
