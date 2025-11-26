@@ -302,7 +302,7 @@
             </button>
             <div class="wechat-qr-popup" id="wechat-qr-popup">
               <div class="qr-code-wrapper">
-                <img src="${getBase('img/wechat-qr.png')}" alt="微信二维码" class="qr-code-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <img src="${getBase('/img/wechat-qr.png')}" alt="微信二维码" class="qr-code-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                 <div class="qr-code-placeholder" style="display: none;">
                   <i class="bi bi-qr-code-scan" style="font-size: 80px; color: #999;"></i>
                   <p style="margin-top: 10px; color: #999; font-size: 14px;">请添加微信二维码图片<br>路径: ./img/wechat-qr.png</p>
@@ -317,7 +317,7 @@
             </button>
             <div class="feishu-qr-popup" id="feishu-qr-popup">
               <div class="qr-code-wrapper">
-                <img src="${getBase('img/feishu-qr.png')}" alt="飞书二维码" class="qr-code-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                <img src="${getBase('/img/feishu-qr.png')}" alt="飞书二维码" class="qr-code-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                 <div class="qr-code-placeholder" style="display: none;">
                   <i class="bi bi-qr-code-scan" style="font-size: 80px; color: #999;"></i>
                   <p style="margin-top: 10px; color: #999; font-size: 14px;">请添加飞书二维码图片<br>路径: ./img/feishu-qr.png</p>
